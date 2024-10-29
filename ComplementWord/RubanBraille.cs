@@ -269,8 +269,17 @@ namespace fr.avh.braille.addin
                         actions.Activate();
                     }
                 } else {
-                    // Pas de dictionnaire de traitement, on protège juste la selection
-                    ProtectionWord.Proteger(Globals.ThisAddIn.Application.ActiveDocument, selection);
+                    // Pas de dictionnaire de traitement, si la selection de mots est composé de plusieurs mots, protéger le texte entier avec ProtegerBloc
+                    if(selection.Text.Split(' ').Length > 1)
+                    {
+                        ProtectionWord.ProtegerBloc(Globals.ThisAddIn.Application.ActiveDocument, selection);
+                        return;
+                    }
+                    else
+                    {
+                        // Pas de dictionnaire de traitement, on protège juste la selection
+                        ProtectionWord.Proteger(Globals.ThisAddIn.Application.ActiveDocument, selection);
+                    }
                 }
             }
         }
@@ -313,8 +322,18 @@ namespace fr.avh.braille.addin
                         actions.Activate();
                     }
                 } else {
-                    // Pas de dictionnaire de traitement, on protège juste la selection
-                    ProtectionWord.Abreger(Globals.ThisAddIn.Application.ActiveDocument, selection);
+
+                    if (selection.Text.Split(' ').Length > 1)
+                    {
+                        ProtectionWord.AbregerBloc(Globals.ThisAddIn.Application.ActiveDocument, selection);
+                        return;
+                    }
+                    else
+                    {
+                        // Pas de dictionnaire de traitement, on protège juste la selection
+                        ProtectionWord.Abreger(Globals.ThisAddIn.Application.ActiveDocument, selection);
+                    }
+                    
                 }
             }
         }

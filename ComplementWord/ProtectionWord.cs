@@ -22,6 +22,8 @@ namespace fr.avh.braille.addin
         ///
         /// </summary>
         private static readonly string PROTECTION_CODE = "[[*i*]]";
+        private static readonly string PROTECTION_CODE_G1 = "[[*G1*]]";
+        private static readonly string PROTECTION_CODE_G2 = "[[*G2*]]";
         private static readonly string SEPARATORS = "\"\'\\t\\f\\v\\r\\n\\[\\]\\(\\);,.:  ";
         private static readonly string MIN = "a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý";
         private static readonly string MAJ = "A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ";
@@ -1358,6 +1360,39 @@ namespace fr.avh.braille.addin
             return wordRange;
         }
 
+        /// <summary>
+        /// Fonction utilitaire de protection d'un bloc de mots dans un document.
+        /// </summary>
+        /// <param name="current"></param>
+        /// <param name="wordRange"></param>
+        /// <returns></returns>
+        public static MSWord.Range ProtegerBloc(MSWord.Document current, MSWord.Range wordRange)
+        {
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0)
+            {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = current.Range(
+                    wordRange.Start + trimmedCount,
+                    wordRange.End
+                );
+                wordRange.Select();
+            }
+
+            if (!EstProteger(current, wordRange))
+            {
+                wordRange.InsertBefore(PROTECTION_CODE_G1);
+                wordRange.InsertAfter(PROTECTION_CODE_G2);
+                wordRange = current.Range(
+                    wordRange.Start + PROTECTION_CODE_G1.Length,
+                    wordRange.End - PROTECTION_CODE_G2.Length
+                );
+                wordRange.Select();
+            }
+            return wordRange;
+        }
+
         public static bool EstProteger(MSWord.Document current, MSWord.Range wordRange)
         {
             string trimmedStart = wordRange.Text.TrimStart();
@@ -1452,6 +1487,72 @@ namespace fr.avh.braille.addin
         public MSWord.Range Abreger(MSWord.Range wordRange)
         {
             return Abreger(_document, wordRange);
+        }
+
+        public static MSWord.Range AbregerBloc(Document current, MSWord.Range wordRange)
+        {
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0)
+            {
+                wordRange = current.Range(
+                    wordRange.Start + trimmedCount,
+                    wordRange.End
+                );
+                wordRange.Select();
+            }
+
+            // si le mot est précédé de suffisament de caractères pour être protégé
+            if (wordRange.Start - PROTECTION_CODE_G1.Length >= 0 && wordRange.End + PROTECTION_CODE_G2.Length <= current.Content.End)
+            {
+                MSWord.Range previous = current.Range(
+                    wordRange.Start - PROTECTION_CODE_G1.Length,
+                    wordRange.Start
+                );
+                string previousText = previous.Text;
+                // si le mot est précédé du code de protection G1
+                if (previousText.Equals(PROTECTION_CODE_G1))
+                {
+                    // Suppression du code de protection G1
+                    Range toDelete = current.Range(
+                        wordRange.Start - PROTECTION_CODE_G1.Length,
+                        wordRange.Start
+                    );
+
+                    // Suppression du code de protection G2
+                    toDelete.Delete();
+                    wordRange = current.Range(toDelete.End, wordRange.End);
+                    wordRange.Select();
+                }
+                MSWord.Range next = current.Range(
+                    wordRange.End,
+                    wordRange.End + PROTECTION_CODE_G2.Length
+                );
+                // si le mot est suivi du code de protection G2
+                string nextText = next.Text;
+                if (nextText.Equals(PROTECTION_CODE_G2))
+                {
+                    Range toDelete = current.Range(
+                        wordRange.End,
+                        wordRange.End + PROTECTION_CODE_G2.Length
+                    );
+                    toDelete.Delete();
+                    wordRange = current.Range(wordRange.Start, toDelete.Start); //est ce qu'on peut lier le start et le end pour avoir moin de code
+                    wordRange.Select();
+                }
+            }
+            if (trimmedStart.StartsWith(PROTECTION_CODE_G1))
+            {
+                Range toDelete = current.Range(
+                    wordRange.Start,
+                    wordRange.Start + PROTECTION_CODE_G1.Length
+                );
+                toDelete.Delete();
+                wordRange = current.Range(toDelete.End, wordRange.End);
+                wordRange.Select();
+            }
+            string word = wordRange.Text.ToLower().Trim();
+            return wordRange;
         }
 
         /// <summary>
