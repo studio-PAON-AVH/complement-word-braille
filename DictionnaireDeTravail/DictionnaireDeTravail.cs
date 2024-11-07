@@ -1,4 +1,5 @@
 ﻿using fr.avh.braille.dictionnaire.Entities;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +8,7 @@ using System.Runtime.Remoting.Contexts;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace fr.avh.braille.dictionnaire
 {
@@ -32,7 +34,6 @@ namespace fr.avh.braille.dictionnaire
         public List<Statut> StatutsOccurences { get; private set; }
 
         public List<bool> StatutsAppliquer { get; private set; }
-
 
         /// <summary>
         /// Liste des contextes avant les occurences
@@ -60,12 +61,18 @@ namespace fr.avh.braille.dictionnaire
         /// </summary>
         /// <param name="mot">si définit, renvoie uniquement les occurences du mot spécifié dans le texte</param>
         /// <returns>Une liste de tuple (index, mot, statut, contextAvant, contextApres)</returns>
-        public List<Tuple<int, string, Statut, string, string>> OccurencesAsListOfTuples(string mot = "")
+        public List<Tuple<int, string, Statut, string, string>> OccurencesAsListOfTuples(
+            string mot = ""
+        )
         {
-            List<Tuple<int, string, Statut, string, string>> result = new List<Tuple<int, string, Statut, string, string>>();
-            if (mot.Length > 0) {
-                if(CarteMotOccurences.ContainsKey(mot.ToLower().Trim())) {
-                    foreach (int indexOccurence in CarteMotOccurences[mot.ToLower().Trim()]) {
+            List<Tuple<int, string, Statut, string, string>> result =
+                new List<Tuple<int, string, Statut, string, string>>();
+            if (mot.Length > 0)
+            {
+                if (CarteMotOccurences.ContainsKey(mot.ToLower().Trim()))
+                {
+                    foreach (int indexOccurence in CarteMotOccurences[mot.ToLower().Trim()])
+                    {
                         result.Add(
                             new Tuple<int, string, Statut, string, string>(
                                 indexOccurence,
@@ -77,8 +84,11 @@ namespace fr.avh.braille.dictionnaire
                         );
                     }
                 }
-            } else {
-                for (int indexOccurence = 0; indexOccurence < Occurences.Count; indexOccurence++) {
+            }
+            else
+            {
+                for (int indexOccurence = 0; indexOccurence < Occurences.Count; indexOccurence++)
+                {
                     result.Add(
                         new Tuple<int, string, Statut, string, string>(
                             indexOccurence,
@@ -90,7 +100,7 @@ namespace fr.avh.braille.dictionnaire
                     );
                 }
             }
-            
+
             return result;
         }
 
@@ -114,7 +124,13 @@ namespace fr.avh.braille.dictionnaire
         /// <param name="mot"></param>
         /// <param name="statut"></param>
         /// <param name="contexte"></param>
-        public void Add(string mot, Statut statut, string contexteAvant = "", string contextApres = "", int position = 0)
+        public void Add(
+            string mot,
+            Statut statut,
+            string contexteAvant = "",
+            string contextApres = "",
+            int position = 0
+        )
         {
             lock (this) {
                 Occurences.Add(mot);
@@ -131,26 +147,37 @@ namespace fr.avh.braille.dictionnaire
         {
             // Réordonner les listes d'informations des occurences en fonction de la liste des positions
             List<int> reorderedIndexes = new List<int>();
-            for(int i = 0; i < PositionsOccurences.Count; i++) {
+            for (int i = 0; i < PositionsOccurences.Count; i++)
+            {
                 reorderedIndexes.Add(i);
             }
-            reorderedIndexes.Sort((a, b) => PositionsOccurences[a].CompareTo(PositionsOccurences[b]));
+            reorderedIndexes.Sort(
+                (a, b) => PositionsOccurences[a].CompareTo(PositionsOccurences[b])
+            );
 
             List<string> newOccurences = new List<string>(Occurences.Count);
             List<int> newPositionsOccurences = new List<int>(PositionsOccurences.Count);
             List<Statut> newStatutsOccurences = new List<Statut>(StatutsOccurences.Count);
             List<bool> newStatutsAppliquer = new List<bool>(StatutsAppliquer.Count);
-            List<string> newContextesAvantOccurences = new List<string>(ContextesAvantOccurences.Count);
-            List<string> newContextesApresOccurences = new List<string>(ContextesApresOccurences.Count);
+            List<string> newContextesAvantOccurences = new List<string>(
+                ContextesAvantOccurences.Count
+            );
+            List<string> newContextesApresOccurences = new List<string>(
+                ContextesApresOccurences.Count
+            );
 
             // NP 2024 10 04 : supprimer les détections en doublons
             // Reconstruirer les listes d'occurences basé sur cette liste d'index
-            int previousPosition = -1;  
-            foreach(int newIndex in reorderedIndexes) {
-                if(PositionsOccurences[newIndex] == previousPosition) {
+            int previousPosition = -1;
+            foreach (int newIndex in reorderedIndexes)
+            {
+                if (PositionsOccurences[newIndex] == previousPosition)
+                {
                     // On ignore les doublons en nous basant sur les positions dans le texte analysé
                     continue;
-                } else {
+                }
+                else
+                {
                     previousPosition = PositionsOccurences[newIndex];
                 }
                 newOccurences.Add(Occurences[newIndex]);
@@ -167,7 +194,6 @@ namespace fr.avh.braille.dictionnaire
             StatutsAppliquer = newStatutsAppliquer;
             ContextesAvantOccurences = newContextesAvantOccurences;
             ContextesApresOccurences = newContextesApresOccurences;
-
         }
 
         /// <summary>
@@ -176,9 +202,11 @@ namespace fr.avh.braille.dictionnaire
         public void ComputeWordMap()
         {
             CarteMotOccurences.Clear();
-            for (int i = 0; i < Occurences.Count; i++) {
+            for (int i = 0; i < Occurences.Count; i++)
+            {
                 string mot = Occurences[i].ToLower().Trim();
-                if (!CarteMotOccurences.ContainsKey(mot)) {
+                if (!CarteMotOccurences.ContainsKey(mot))
+                {
                     CarteMotOccurences.Add(mot, new List<int>());
                 }
                 CarteMotOccurences[mot].Add(i);
@@ -187,8 +215,10 @@ namespace fr.avh.braille.dictionnaire
 
         public void SetStatut(string mot, Statut selected)
         {
-            if (CarteMotOccurences.ContainsKey(mot.ToLower().Trim())) {
-                foreach (int index in CarteMotOccurences[mot.ToLower().Trim()]) {
+            if (CarteMotOccurences.ContainsKey(mot.ToLower().Trim()))
+            {
+                foreach (int index in CarteMotOccurences[mot.ToLower().Trim()])
+                {
                     StatutsOccurences[index] = selected;
                 }
             }
@@ -202,22 +232,29 @@ namespace fr.avh.braille.dictionnaire
         public Statut StatutMot(string mot)
         {
             Statut statut = Statut.INCONNU;
-            if (CarteMotOccurences.ContainsKey(mot.ToLower().Trim())) {
-                foreach (int index in CarteMotOccurences[mot.ToLower().Trim()]) {
-                    if (StatutsOccurences[index] == Statut.INCONNU) {
+            if (CarteMotOccurences.ContainsKey(mot.ToLower().Trim()))
+            {
+                foreach (int index in CarteMotOccurences[mot.ToLower().Trim()])
+                {
+                    if (StatutsOccurences[index] == Statut.INCONNU)
+                    {
                         // S'il reste une occurence inconnu, le statut est inconnu
                         return Statut.INCONNU;
-                    } else if (
+                    }
+                    else if (
                         StatutsOccurences[index] == Statut.IGNORE
                         || statut == Statut.PROTEGE && StatutsOccurences[index] == Statut.ABREGE
                         || statut == Statut.ABREGE && StatutsOccurences[index] == Statut.PROTEGE
-                    ) {
+                    )
+                    {
                         // Si une seul occurence est marqué ambigu,
                         // ou si le mot a été protégé ou abrégé puis a ensuite été respectivement abrégé ou protégé
                         // On considere qu'on ignore le statut général (detournement de sens du statut ignorer, mais c'est pour simplifier)
                         // (normalement ce statut c'est pour dire que le transcripteur a ignorer le mot lors du traitement)
                         return Statut.IGNORE;
-                    } else {
+                    }
+                    else
+                    {
                         statut = StatutsOccurences[index];
                     }
                 }
@@ -235,12 +272,15 @@ namespace fr.avh.braille.dictionnaire
             CarteMotOccurences = new Dictionary<string, List<int>>();
             ContextesAvantOccurences = new List<string>();
             ContextesApresOccurences = new List<string>();
-            
         }
 
-        public async static Task<DictionnaireDeTravail> FromDictionnaryFile(string filePath, CancellationTokenSource canceler = null)
+        public static async Task<DictionnaireDeTravail> FromDictionnaryFile(
+            string filePath,
+            CancellationTokenSource canceler = null
+        )
         {
-            if (canceler != null && canceler.Token.IsCancellationRequested) {
+            if (canceler != null && canceler.Token.IsCancellationRequested)
+            {
                 return null;
             }
             DictionnaireDeTravail result = new DictionnaireDeTravail(Path.GetFileName(filePath));
@@ -255,38 +295,44 @@ namespace fr.avh.braille.dictionnaire
             // plus de compteur de mot (le nb de ligne est le nb de mot)
             // 1 ligne = 1 code + 1 occurence d'un mot identifié dans le texte (avec sa casse)
             // A noter que la ligne du mot est supposément l'identifiant de son occurence dans le texte
-            using (StreamReader fileReader = new StreamReader(filePath, utf8)) {
-                
+            using (StreamReader fileReader = new StreamReader(filePath, utf8))
+            {
                 string line;
-                while ((line = await fileReader.ReadLineAsync()) != null) {
-                    if(line.Length == 0) { // avoid empty lines
+                while ((line = await fileReader.ReadLineAsync()) != null)
+                {
+                    if (line.Length == 0)
+                    { // avoid empty lines
                         continue;
                     }
-                    if (canceler != null && canceler.Token.IsCancellationRequested) {
+                    if (canceler != null && canceler.Token.IsCancellationRequested)
+                    {
                         return null;
                     }
-                    
+
                     int code = line[0] - '0';
                     string word = line.Substring(1);
-                    try {
+                    try
+                    {
                         // get the code as first char
                         Statut wordStatus = Enum.IsDefined(typeof(Statut), code)
                             ? (Statut)code
                             : Statut.INCONNU;
                         result.Add(word, wordStatus);
                     }
-                    catch (Exception e) {
+                    catch (Exception e)
+                    {
                         // Abort transaction
-                        Globals.logAsync($"Skipping line {line} due to error while parsing : {e.Message}");
+                        Globals.logAsync(
+                            $"Skipping line {line} due to error while parsing : {e.Message}"
+                        );
                         //throw new Exception($"Une erreur s'est produite en analysant '{line}'", e);
                     }
-
-                    
                 }
             }
             result.ComputeWordMap();
             return result;
         }
+
         /// <summary>
         /// Sauvegarder sur le disque
         /// </summary>
@@ -294,11 +340,82 @@ namespace fr.avh.braille.dictionnaire
         public void Save(DirectoryInfo folder)
         {
             Encoding utf8 = Encoding.UTF8;
-            using (StreamWriter fileWriter = new StreamWriter(Path.Combine(folder.FullName, NomDictionnaire), false, utf8)) {
-                for(int i=0; i < Occurences.Count; i++ ) {
+            using (
+                StreamWriter fileWriter = new StreamWriter(
+                    Path.Combine(folder.FullName, NomDictionnaire),
+                    false,
+                    utf8
+                )
+            )
+            {
+                for (int i = 0; i < Occurences.Count; i++)
+                {
                     fileWriter.WriteLine($"{(int)StatutsOccurences[i]}{Occurences[i]}");
                 }
             }
+        }
+
+        public static async Task<DictionnaireDeTravail> FromDictionnaryFileJSON(
+           string filePath,
+           CancellationTokenSource canceler = null
+       )
+        {
+            // Vérifier si l'opération a été annulée
+            if (canceler != null && canceler.Token.IsCancellationRequested)
+            {
+                return null;
+            }
+
+            // Créer un nouveau dictionnaire de travail à partir du nom du fichier
+            DictionnaireDeTravail result = new DictionnaireDeTravail(Path.GetFileName(filePath));
+            Globals.logAsync($"Analyse de {result.NomDictionnaire}");
+            Encoding utf8 = Encoding.UTF8;
+
+            // Ouvre le fichier en lecture avec l'encodage UTF-8
+            using (StreamReader fileReader = new StreamReader(filePath, utf8))
+            {
+                string jsonContent = await fileReader.ReadToEndAsync();
+                dynamic jsonObject = JsonConvert.DeserializeObject(jsonContent);
+
+                // Parcours de la liste des mots
+                foreach (var mot in jsonObject.mots)
+                {
+                    string word = mot.Name;
+                    Statut statut = (Statut)mot.Value.statut;
+                    List<int> occurences = mot.Value.occurences.ToObject<List<int>>();
+                    foreach (int occurence in occurences)
+                    {
+                        result.Add(word, statut, position: occurence);
+                    }
+                }
+            }
+            result.ComputeWordMap();
+            return result;
+        }
+
+        /// <summary>
+        /// Sauvegarder sur le disque
+        /// </summary>
+        /// <param name="path"></param>
+        public void SaveJSON(DirectoryInfo folder)
+        {
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var jsonObject = new
+            {
+                version = "1.0",
+                nom = NomDictionnaire,
+                mots = CarteMotOccurences.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => new
+                    {
+                        statut = StatutMot(kvp.Key),
+                        occurences = kvp.Value
+                    }
+                ),
+            };
+            string jsonContent = JsonConvert.SerializeObject(jsonObject, Newtonsoft.Json.Formatting.Indented);
+            string cleanedNomDictionnaire = NomDictionnaire.Replace(".bdic", "");
+            File.WriteAllText(Path.Combine(appDataPath, cleanedNomDictionnaire + ".json"), jsonContent);
         }
     }
 }
