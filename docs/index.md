@@ -6,7 +6,7 @@ layout: my-default
 
 Le complément Word "Braille" est un projet réalisé au sein du Pôle Adaptation des Ouvrages Numériques (PAON) de l'[Association Valentin Haüy](https://avh.asso.fr). Ce complément vise à aider la préparation de documents Word en français pour leur transcription en braille abrégé dans l'outil DBT de Duxbury.
 
-- [Télécharger la dernière version](https://github.com/studio-PAON-AVH/complement-word-braille/releases/download/v1.3.5.2/ComplementBrailleWord-1.3.5.2.zip)
+- [Télécharger la dernière version](https://github.com/studio-PAON-AVH/complement-word-braille/releases/download/v1.3.5.3/ComplementBrailleWord-1.3.5.3.zip)
 - Ou accèder à la [page de publication](https://github.com/studio-PAON-AVH/complement-word-braille/releases/latest)
 
 # Installer le complément
@@ -31,6 +31,6 @@ Actuellement, le complément identifie les mots à traiter selon trois critères
 
 Ce complément utilise également une base de données statistiques, issue de précédents traitements de documents pour le braille faits par le PAON. Lors du traitement des mots, ces statistiques sont utilisées pour présélectionner une action recommandée sur le mot en cours de traitement.
 
-# Version 1.3.5.2 (Novembre 2024)
+# Version 1.3.5.3 (Novembre 2024)
 
 Cette version est la première à être mise à disposition du grand public.

@@ -116,7 +116,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DictionnaireDeTravail\DictionnaireDeTravail.csproj">
       <Project>{D6B3BB88-67E1-4CC5-A029-CD2B5FFF25F7}</Project>
-      <Name>Gestionnaire de dictionnaires</Name>
+      <Name>DictionnaireDeTravail</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

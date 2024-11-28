@@ -11,6 +11,17 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ComplementWord", "Complemen
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScriptsBaseDeDonnée", "ScriptsSQLite\ScriptsBaseDeDonnée.csproj", "{8581F9E1-94A8-448F-82E9-662105DF5ECF}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{6D6C4EC3-068F-48BB-906A-B18FCDBC0B7D}"
+	ProjectSection(SolutionItems) = preProject
+		docs\changelog.docx = docs\changelog.docx
+		docs\changelog.md = docs\changelog.md
+		docs\documentation_utilisateur.docx = docs\documentation_utilisateur.docx
+		docs\documentation_utilisateur.md = docs\documentation_utilisateur.md
+		docs\index.md = docs\index.md
+		docs\manuel_abrege2013_complet_noir_0.pdf = docs\manuel_abrege2013_complet_noir_0.pdf
+		docs\_config.yml = docs\_config.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
