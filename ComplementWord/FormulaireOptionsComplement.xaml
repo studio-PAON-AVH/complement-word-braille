@@ -1,0 +1,13 @@
+﻿<Window x:Class="fr.avh.braille.addin.FormulaireOptionsComplement"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:fr.avh.braille.addin"
+             mc:Ignorable="d"
+            Title="Options du complément" Width="301" Height="154">
+    <Grid Margin="0,0,0,0">
+        <CheckBox x:Name="ActiverPreProtectionAuto" Content="Activer le pré-marquage automatique" Margin="10,10,10,0" Height="21" VerticalAlignment="Top" Checked="ActiverPreProtectionAuto_Checked"  Unchecked="ActiverPreProtectionAuto_Unchecked"/>
+        <Button x:Name="FermerFenetre" Content="Fermer" Margin="0,0,10,10" HorizontalAlignment="Right" Width="55" Height="21" VerticalAlignment="Bottom" Click="FermerFenetre_Click" />
+    </Grid>
+</Window>
