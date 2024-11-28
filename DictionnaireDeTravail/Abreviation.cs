@@ -1288,7 +1288,7 @@ namespace fr.avh.braille.dictionnaire
             "dactylo", //doigt	dactylographie
             "poly", //nombreux	polyèdre, polygone
             "dé",
-            "d",
+            //"d",
             "des", //cessation	désunion
             "post", //après	postdater, postscolaire
             "déca",
@@ -1341,7 +1341,7 @@ namespace fr.avh.braille.dictionnaire
             "électro", //ambre jaune	électrochoc
             "quinqu", //cinq	quinquagénaire, quinquennal
             "embryo", //foetus	embryologie
-            "r",
+            //"r",
             "re", //de nouveau	rouvrir, réargenter
             "en",
             "em", //dans	encéphale, endémie, enfermer
@@ -1546,7 +1546,7 @@ namespace fr.avh.braille.dictionnaire
             "logo", //discours, science	logomachie
             "xylo", //bois	xylophone
             "zoo", //animal	zoologie
-        };
+        }.OrderBy(p => p).OrderBy(p => p.Length).Reverse().ToList();
 
 
 
@@ -1856,10 +1856,11 @@ namespace fr.avh.braille.dictionnaire
                         // Le com s'abrège si (i = position du com dans le mot)
                         // - début de mot ou de ligne apres coupure (je vais garder que début de mot, donc si i == 0, et tester que les mots plus grand ?)
                         // - apres prefixe (i > 0) devant consonne (i < taille - 1 et consonne après i)
-                        int index = mot.ToLower().IndexOf("com");
+                        List<string> syllabes = DecoupageSyllabes(mot.ToLower());
+                        int index = syllabes.FindIndex(s => s.Contains("com"));
+                        int indexInSyllable = index >= 0 ? syllabes[index].IndexOf("com") : -1;
                         return (
-                                index == 0
-                            /*&& mot.ToLower().Length > 3*/
+                                index == 0 && indexInSyllable == 0
                             )
                             || (
                                 index > 1
@@ -1929,11 +1930,11 @@ namespace fr.avh.braille.dictionnaire
                     {
                         // Les signes pour an, eu, et or ne s'emploient pas isolément
                         // le signe an ne s'emploie pas à la fin des mots.
-                        int anIndex = mot.ToLower().IndexOf("an");
-                        return anIndex > -1 // Contient an
-                            && anIndex < (mot.ToLower().Length - 2) // Pas a la fin du mot
-                            && DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("an"))
-                                >= 0; // dans une syllabe
+                        List<string> syllabes = DecoupageSyllabes(mot.ToLower());
+                        int anIndex = syllabes.FindIndex((s) => s.Contains("an"));
+                        int anIndexInSyllabe =  anIndex >= 0 ? syllabes[anIndex].IndexOf("an") : -1;
+                        return anIndex > -1 // le mot contient une syllabe qui contien an
+                            && !( anIndex == syllabes.Count - 1 && anIndexInSyllabe == syllabes[anIndex].Length - 2); // mais pas a la fin de la derniere syllabe
                     }
                 },
                 {
@@ -2002,19 +2003,20 @@ namespace fr.avh.braille.dictionnaire
                     "es",
                     (mot) =>
                     {
-                        int index = mot.ToLower().IndexOf("es");
+                        List<string> syllabes = DecoupageSyllabes(mot.ToLower());
+                        int index = syllabes.FindIndex(s => s.Contains("es"));
+                        int indexInSyllabe = index >= 0 ? syllabes[index].IndexOf("es") : -1;
+                        int indexInMot = mot.ToLower().IndexOf("es");
                         // Regle pour ES
                         //  d. d'un mot ou d'une ligne après coupure
                         // - après préfixe
                         // - t.
                         return mot.ToLower().Length > 2
                             && (
-                                index == 0
-                                || (index > 0 && GetMatchingPrefix(mot.ToLower(),index) != null)
-                                || index == mot.ToLower().Length - 2
-                            )
-                            && DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("es"))
-                                >= 0;
+                                (index == 0 && indexInSyllabe == 0)
+                                || (indexInMot > 0 && GetMatchingPrefix(mot.ToLower(),indexInMot) != null)
+                                || (index == syllabes.Count -1 && indexInSyllabe == syllabes[index].Length - 2)
+                            );
                     }
                 },
                 {
