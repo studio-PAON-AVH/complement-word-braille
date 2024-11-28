@@ -1,8 +1,28 @@
-# Complément Word pour le traitement du braille
+---
+title: Complément Word pour le braille abrégé
+layout: my-default
+---
+
 
 Le complément Word "Braille" est un projet réalisé au sein du Pôle Adaptation des Ouvrages Numériques (PAON) de l'[Association Valentin Haüy](https://avh.asso.fr). Ce complément vise à aider la préparation de documents Word en français pour leur transcription en braille abrégé dans l'outil DBT de Duxbury.
 
-Lorsque l'utilisateur demande à lancer le traitement via le ruban de Word, le complément analyse le document pour en extraire une liste des mots abrégeables pouvant nécessiter d'être "protégés" (c'est-à-dire conservés dans leur forme intégrale) dans certains contextes. L'utilisateur a alors accès à une boîte de dialogue spécifique lui permettant de protéger, d'abréger ou d'ignorer tout ou partie des occurrences du mot identifiées dans le document. L'action de protection d'une occurrence d'un mot se traduit dans le document par l'insertion du code DBT de conservation en forme intégrale `[[*i*]]` devant cette occurrence, tandis que l'action d'abréviation supprime ce code s'il existait précédemment.
+- [Télécharger la dernière version](https://github.com/studio-PAON-AVH/complement-word-braille/releases/download/v1.3.5.2/ComplementBrailleWord-1.3.5.2.zip)
+- Ou accèder à la [page de publication](https://github.com/studio-PAON-AVH/complement-word-braille/releases/latest)
+
+# Installer le complément
+
+- Dezipper l'archive zip du complément
+- (Optionnel) installer le certificat `certificat-devs-paons.crt`
+  - Ce certificat identifie les développements réalisé par le PAON.
+- Lancer le fichier `setup.exe`
+- Accepter l'installation du VSTO
+- Fermer et rouvrer Microsoft Word, et vérifier qu'un onglet **Braille** apparait dans le ruban de l'application.
+
+# Traiter un document pour le braille
+
+Le complément ajoute a Microsoft Word un nouvel onglet **Braille** dans le ruban.
+
+Lorsque l'utilisateur demande à lancer le traitement via ce nouvel onglet, le complément analyse le document pour en extraire une liste des mots abrégeables pouvant nécessiter d'être "protégés" (c'est-à-dire conservés dans leur forme intégrale) dans certains contextes. L'utilisateur a alors accès à une boîte de dialogue spécifique lui permettant de protéger, d'abréger ou d'ignorer tout ou partie des occurrences du mot identifiées dans le document. L'action de protection d'une occurrence d'un mot se traduit dans le document par l'insertion du code DBT de conservation en forme intégrale `[[*i*]]` devant cette occurrence, tandis que l'action d'abréviation supprime ce code s'il existait précédemment.
 
 Actuellement, le complément identifie les mots à traiter selon trois critères :
 - Si le mot contient au moins une majuscule

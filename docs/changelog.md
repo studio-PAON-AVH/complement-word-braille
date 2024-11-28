@@ -1,4 +1,8 @@
-# Journal des modifications
+---
+title: Complément braille - journal de développement
+layout: my-default
+---
+
 
 | **Version**  | **Date**  | **Changement**  | **Auteurs**  |
 |:--:|----|----|----|

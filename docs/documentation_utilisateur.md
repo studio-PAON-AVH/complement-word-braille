@@ -1,5 +1,7 @@
-
-# Documentation Utilisateur
+---
+title: Complément braille - Documentation utilisateur
+layout: my-default
+---
 
 ## Table des matières
 
