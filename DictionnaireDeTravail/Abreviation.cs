@@ -977,11 +977,17 @@ namespace fr.avh.braille.dictionnaire
                 }
             }
 
-            List<string> syllabes = DecoupageSyllabes(cleanedup);
-            foreach (var ambiguite in AmbiguiterAbbreviation) {
-                if (ambiguite.Value(cleanedup)) {
+            List<Tuple<int, string>> syllabes = DecoupageSyllabes(cleanedup);
+            foreach (var ambiguite in AmbiguiterAbbreviation)
+            {
+                if (ambiguite.Value(cleanedup))
+                {
                     //Console.WriteLine($"{cleanedup} abrégable par la règle de '{ambiguite.Key}'");
-                    return "Non-abrégeable sur " + ambiguite.Key + " (" + string.Join("|", syllabes) + ")";
+                    return "Non-abrégeable sur "
+                        + ambiguite.Key
+                        + " ("
+                        + string.Join("|", syllabes.Select(t => t.Item2).ToArray())
+                        + ")";
                 }
             }
             foreach (var testAbbr in AbbreviationGroupeLettres)
@@ -989,10 +995,13 @@ namespace fr.avh.braille.dictionnaire
                 if (testAbbr.Value(cleanedup))
                 {
                     //Console.WriteLine($"{cleanedup} abrégable par la règle de '{testAbbr.Key}'");
-                    return testAbbr.Key + " (" + string.Join("|", syllabes) + ")";
+                    return testAbbr.Key
+                        + " ("
+                        + string.Join("|", syllabes.Select(t => t.Item2).ToArray())
+                        + ")";
                 }
             }
-            return "aucune (" + string.Join("|", syllabes) + ")";
+            return "aucune (" + string.Join("|", syllabes.Select(t => t.Item2).ToArray()) + ")";
         }
 
         public static bool EstAbregeable(string mot)
@@ -1011,8 +1020,10 @@ namespace fr.avh.braille.dictionnaire
                     return true;
                 }
             }
-            foreach (var ambiguite in AmbiguiterAbbreviation) {
-                if (ambiguite.Value(cleanedup)) {
+            foreach (var ambiguite in AmbiguiterAbbreviation)
+            {
+                if (ambiguite.Value(cleanedup))
+                {
                     //Console.WriteLine($"{cleanedup} abrégable par la règle de '{ambiguite.Key}'");
                     return false;
                 }
@@ -1034,6 +1045,20 @@ namespace fr.avh.braille.dictionnaire
             "ph",
             "th",
             "gn",
+            "br",
+            "cr",
+            "dr",
+            "fr",
+            "gr",
+            "kr",
+            "pr",
+            "tr",
+            "vr",
+            "bl",
+            "cl",
+            "fl",
+            "gl",
+            "pl"
         };
 
         private static readonly List<string> PREFIXES = new List<string>
@@ -1546,9 +1571,11 @@ namespace fr.avh.braille.dictionnaire
             "logo", //discours, science	logomachie
             "xylo", //bois	xylophone
             "zoo", //animal	zoologie
-        }.OrderBy(p => p).OrderBy(p => p.Length).Reverse().ToList();
-
-
+        }
+            .OrderBy(p => p)
+            .OrderBy(p => p.Length)
+            .Reverse()
+            .ToList();
 
         /// <summary>
         /// Test si un préfixe est présent dans un mot avant un indice donné
@@ -1574,7 +1601,7 @@ namespace fr.avh.braille.dictionnaire
         /// </summary>
         /// <param name="mot"></param>
         /// <returns></returns>
-        private static List<string> DecoupageSyllabes(string mot)
+        private static List<Tuple<int, string>> DecoupageSyllabes(string mot)
         {
             /*
             La règle générale est de séparer les syllabes entre une voyelle et une consonne.
@@ -1601,7 +1628,7 @@ namespace fr.avh.braille.dictionnaire
             On ne découpe pas un mot après une apostrophe.
             Exemples : L’arbre / l’élève
             */
-            List<string> syllabes = new List<string>();
+            List<Tuple<int, string>> syllabes = new List<Tuple<int, string>>();
             int syllabeStart = 0;
             int voyellePrecedente = -1;
             bool separator = false;
@@ -1613,7 +1640,9 @@ namespace fr.avh.braille.dictionnaire
                 {
                     separator = false;
                     // Je vais garder les séparateurs dans la syllabe (sinon, ajouter -1 a la longueur)
-                    syllabes.Add(mot.Substring(syllabeStart, i - syllabeStart));
+                    syllabes.Add(
+                        Tuple.Create(syllabeStart, mot.Substring(syllabeStart, i - syllabeStart))
+                    );
                     // on reset la syllabe
                     syllabeStart = i;
                     voyellePrecedente = -1;
@@ -1642,9 +1671,12 @@ namespace fr.avh.braille.dictionnaire
                             {
                                 // on casse avant la consonne
                                 syllabes.Add(
-                                    mot.Substring(
+                                    Tuple.Create(
                                         syllabeStart,
-                                        voyellePrecedente + 1 - syllabeStart
+                                        mot.Substring(
+                                            syllabeStart,
+                                            voyellePrecedente + 1 - syllabeStart
+                                        )
                                     )
                                 );
                                 syllabeStart = voyellePrecedente + 1;
@@ -1654,19 +1686,16 @@ namespace fr.avh.braille.dictionnaire
                         {
                             // On ne sépare jamais les groupes de consonnes « ch« , « ph« , « th« , « gn »
                             // et on ne sépare pas les groupes de consonnes si elles sont différentes et suivi d'un r ou d'un l
-                            if (
-                                CONSONNESINCASSABLE.Contains(between.ToLower())
-                                || (
-                                    between.ToLower()[0] != between.ToLower()[1]
-                                    && (between.ToLower()[1] == 'l' || between.ToLower()[1] == 'r')
-                                )
-                            )
+                            if (CONSONNESINCASSABLE.Contains(between.ToLower()))
                             {
                                 // on casse avant les consonnes
                                 syllabes.Add(
-                                    mot.Substring(
+                                    Tuple.Create(
                                         syllabeStart,
-                                        voyellePrecedente + 1 - syllabeStart
+                                        mot.Substring(
+                                            syllabeStart,
+                                            voyellePrecedente + 1 - syllabeStart
+                                        )
                                     )
                                 );
                                 syllabeStart = voyellePrecedente + 1;
@@ -1675,9 +1704,12 @@ namespace fr.avh.braille.dictionnaire
                             {
                                 // Lorsque deux consonnes se suivent, la césure s’effectue entre les deux, ce qui est toujours le cas dès lors qu’elles sont doublées.
                                 syllabes.Add(
-                                    mot.Substring(
+                                    Tuple.Create(
                                         syllabeStart,
-                                        voyellePrecedente + 2 - syllabeStart
+                                        mot.Substring(
+                                            syllabeStart,
+                                            voyellePrecedente + 2 - syllabeStart
+                                        )
                                     )
                                 );
                                 syllabeStart = voyellePrecedente + 2;
@@ -1693,9 +1725,12 @@ namespace fr.avh.braille.dictionnaire
                                     a2consonneIdentique = true;
                                     // 2 consonnes identiques trouvé, on sépare après la première
                                     syllabes.Add(
-                                        mot.Substring(
+                                        Tuple.Create(
                                             syllabeStart,
-                                            voyellePrecedente + j + 2 - syllabeStart
+                                            mot.Substring(
+                                                syllabeStart,
+                                                voyellePrecedente + j + 2 - syllabeStart
+                                            )
                                         )
                                     );
                                     syllabeStart = voyellePrecedente + j + 1;
@@ -1718,9 +1753,12 @@ namespace fr.avh.braille.dictionnaire
                                 {
                                     // on sépare avant la double consonne
                                     syllabes.Add(
-                                        mot.Substring(
+                                        Tuple.Create(
                                             syllabeStart,
-                                            voyellePrecedente + indexOfIncass + 1 - syllabeStart
+                                            mot.Substring(
+                                                syllabeStart,
+                                                voyellePrecedente + indexOfIncass + 1 - syllabeStart
+                                            )
                                         )
                                     );
                                     syllabeStart = voyellePrecedente + indexOfIncass + 1;
@@ -1729,9 +1767,12 @@ namespace fr.avh.braille.dictionnaire
                                 {
                                     // si r ou l accolé a la deuxieme consonne, on sépare apres la première
                                     syllabes.Add(
-                                        mot.Substring(
+                                        Tuple.Create(
                                             syllabeStart,
-                                            voyellePrecedente + 2 - syllabeStart
+                                            mot.Substring(
+                                                syllabeStart,
+                                                voyellePrecedente + 2 - syllabeStart
+                                            )
                                         )
                                     );
                                     syllabeStart = voyellePrecedente + 2;
@@ -1740,9 +1781,12 @@ namespace fr.avh.braille.dictionnaire
                                 {
                                     // Lorsque trois consonnes se suivent la coupure doit s’effectuer après la deuxième
                                     syllabes.Add(
-                                        mot.Substring(
+                                        Tuple.Create(
                                             syllabeStart,
-                                            voyellePrecedente + 3 - syllabeStart
+                                            mot.Substring(
+                                                syllabeStart,
+                                                voyellePrecedente + 3 - syllabeStart
+                                            )
                                         )
                                     );
                                     syllabeStart = voyellePrecedente + 3;
@@ -1762,7 +1806,7 @@ namespace fr.avh.braille.dictionnaire
                 }
             }
             if (syllabeStart < mot.Length - 1)
-                syllabes.Add(mot.Substring(syllabeStart));
+                syllabes.Add(Tuple.Create(syllabeStart, mot.Substring(syllabeStart)));
 
             return syllabes;
         }
@@ -1795,9 +1839,12 @@ namespace fr.avh.braille.dictionnaire
             return mot.Length > abbr.Length && index == mot.Length - abbr.Length;
         }
 
-        public static Dictionary<string, Predicate<string>> AmbiguiterAbbreviation = new Dictionary<string, Predicate<string>>
+        public static Dictionary<string, Predicate<string>> AmbiguiterAbbreviation = new Dictionary<
+            string,
+            Predicate<string>
+        >
         {
-            { "z", (mot) => Terminaison(mot, "z") && !Terminaison(mot,"ez") }, // Présence d'un z isolé en fin du mot d'origine
+            { "z", (mot) => Terminaison(mot, "z") && !Terminaison(mot, "ez") }, // Présence d'un z isolé en fin du mot d'origine
         };
 
         // Regles extraites du tableau du manuel
@@ -1840,12 +1887,14 @@ namespace fr.avh.braille.dictionnaire
                 {
                     "ain",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("ain")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("ain"))
+                        >= 0
                 },
                 {
                     "oin",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("oin")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("oin"))
+                        >= 0
                 },
                 { "ait", (mot) => Terminaison(mot, "ait") },
                 { "ant", (mot) => Terminaison(mot, "ant") },
@@ -1856,12 +1905,11 @@ namespace fr.avh.braille.dictionnaire
                         // Le com s'abrège si (i = position du com dans le mot)
                         // - début de mot ou de ligne apres coupure (je vais garder que début de mot, donc si i == 0, et tester que les mots plus grand ?)
                         // - apres prefixe (i > 0) devant consonne (i < taille - 1 et consonne après i)
-                        List<string> syllabes = DecoupageSyllabes(mot.ToLower());
-                        int index = syllabes.FindIndex(s => s.Contains("com"));
-                        int indexInSyllable = index >= 0 ? syllabes[index].IndexOf("com") : -1;
-                        return (
-                                index == 0 && indexInSyllable == 0
-                            )
+                        List<Tuple<int, string>> syllabes = DecoupageSyllabes(mot.ToLower());
+                        int index = syllabes.FindIndex(s => s.Item2.Contains("com"));
+                        int indexInSyllable =
+                            index >= 0 ? syllabes[index].Item2.IndexOf("com") : -1;
+                        return (index == 0 && indexInSyllable == 0)
                             || (
                                 index > 1
                                 && index < (mot.ToLower().Length - 3)
@@ -1872,8 +1920,16 @@ namespace fr.avh.braille.dictionnaire
                 {
                     "con",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantConsonne(s, "con"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "con")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "con"
+                                        )
+                            ) >= 0
                 },
                 {
                     "dis",
@@ -1900,29 +1956,60 @@ namespace fr.avh.braille.dictionnaire
                 {
                     "eur",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("eur")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("eur"))
+                        >= 0
                 },
-                { "ien", (mot) => mot.ToLower().Contains("ien") }, // s'abrège dans tous les cas
+                { "ien", (mot) => mot.ToLower().Contains("ien") }, // s'abrège dans tous les cas (d'apres marius : Le groupe "ien" est abrégé quand il est en fin de mot et précédé d'une consonne.)
                 { "ieu", (mot) => mot.ToLower().Contains("ieu") }, // s'abrège dans tous les cas
-                { "ion", (mot) => mot.ToLower().Contains("ion") }, // s'abrège dans tous les cas
+                { "ion", (mot) =>
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "ion")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "ion"
+                                        )
+                            ) >= 0
+                        || Terminaison(mot, "ion")
+                }, // d'apres marius : Le groupe "ion" est abrégé quand il est en fin de mot ou suivi d'une consonne (ce n'est pas le cas de Giono).
+                //{ "ion", (mot) => mot.ToLower().Contains("ion") }, // s'abrège dans tous les cas
                 {
                     "our",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantConsonne(s, "our"))
-                            >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "our")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "our"
+                                        )
+                            ) >= 0
                         || Terminaison(mot, "our")
                 }, // Note : devant c. et t. (pas sur de ma regle ici)
                 {
                     "pro",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantConsonne(s, "pro"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "pro")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "pro"
+                                        )
+                            ) >= 0
                 },
                 { "que", (mot) => Terminaison(mot, "que") },
                 {
                     "ai",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("ai")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("ai"))
+                        >= 0
                 },
                 {
                     "an",
@@ -1930,82 +2017,139 @@ namespace fr.avh.braille.dictionnaire
                     {
                         // Les signes pour an, eu, et or ne s'emploient pas isolément
                         // le signe an ne s'emploie pas à la fin des mots.
-                        List<string> syllabes = DecoupageSyllabes(mot.ToLower());
-                        int anIndex = syllabes.FindIndex((s) => s.Contains("an"));
-                        int anIndexInSyllabe =  anIndex >= 0 ? syllabes[anIndex].IndexOf("an") : -1;
+                        List<Tuple<int, string>> syllabes = DecoupageSyllabes(mot.ToLower());
+                        int anIndex = syllabes.FindIndex((s) => s.Item2.Contains("an"));
+                        int anIndexInSyllabe =
+                            anIndex >= 0 ? syllabes[anIndex].Item2.IndexOf("an") : -1;
                         return anIndex > -1 // le mot contient une syllabe qui contien an
-                            && !( anIndex == syllabes.Count - 1 && anIndexInSyllabe == syllabes[anIndex].Length - 2); // mais pas a la fin de la derniere syllabe
+                            && !(
+                                anIndex == syllabes.Count - 1
+                                && anIndexInSyllabe == syllabes[anIndex].Item2.Length - 2
+                            ); // mais pas a la fin de la derniere syllabe
                     }
                 },
                 {
                     "ar",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("ar")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("ar"))
+                        >= 0
                 },
                 {
                     "au",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("au")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("au"))
+                        >= 0
                 },
                 {
                     "bl",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "bl"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "bl")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "bl"
+                                        )
+                            ) >= 0
                 },
                 {
                     "br",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "br"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "br")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "br"
+                                        )
+                            ) >= 0
                 },
                 {
                     "ch",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("ch")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("ch"))
+                        >= 0
                 },
                 {
                     "cl",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "cl"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "cl")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "cl"
+                                        )
+                            ) >= 0
                 },
                 {
                     "cr",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "cr"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "cr")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "cr"
+                                        )
+                            ) >= 0
                 },
                 {
                     "dr",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "dr"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "dr")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "dr"
+                                        )
+                            ) >= 0
                 },
                 {
                     "em",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantConsonne(s, "em"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "em")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "em"
+                                        )
+                            ) >= 0
                 },
                 {
                     "en",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("en")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("en"))
+                        >= 0
                 },
                 {
                     "er",
                     (mot) =>
                         mot.ToLower().IndexOf("er") > 0
-                        && DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("er")) >= 0
+                        && DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("er"))
+                            >= 0
                 }, // Le signe pour er ne s'emploie pas au début des mots.
                 {
                     "es",
                     (mot) =>
                     {
-                        List<string> syllabes = DecoupageSyllabes(mot.ToLower());
-                        int index = syllabes.FindIndex(s => s.Contains("es"));
-                        int indexInSyllabe = index >= 0 ? syllabes[index].IndexOf("es") : -1;
+                        List<Tuple<int, string>> syllabes = DecoupageSyllabes(mot.ToLower());
+                        int index = syllabes.FindIndex(s => s.Item2.Contains("es"));
+                        int indexInSyllabe = index >= 0 ? syllabes[index].Item2.IndexOf("es") : -1;
                         int indexInMot = mot.ToLower().IndexOf("es");
                         // Regle pour ES
                         //  d. d'un mot ou d'une ligne après coupure
@@ -2014,47 +2158,94 @@ namespace fr.avh.braille.dictionnaire
                         return mot.ToLower().Length > 2
                             && (
                                 (index == 0 && indexInSyllabe == 0)
-                                || (indexInMot > 0 && GetMatchingPrefix(mot.ToLower(),indexInMot) != null)
-                                || (index == syllabes.Count -1 && indexInSyllabe == syllabes[index].Length - 2)
+                                || (
+                                    indexInMot > 0
+                                    && GetMatchingPrefix(mot.ToLower(), indexInMot) != null
+                                )
+                                || (
+                                    index == syllabes.Count - 1
+                                    && indexInSyllabe == syllabes[index].Item2.Length - 2
+                                )
                             );
                     }
                 },
                 {
                     "eu",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("eu")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("eu"))
+                        >= 0
                 }, // Les signes pour an, eu, et or ne s'emploient pas isolément
                 {
                     "ex",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantConsonne(s, "ex"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "ex")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "ex"
+                                        )
+                            ) >= 0
                 },
                 { "ez", (mot) => Terminaison(mot, "ez") },
                 {
                     "fl",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "fl"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "fl")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "fl"
+                                        )
+                            ) >= 0
                 },
                 {
                     "fr",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "fr"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "fr")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "fr"
+                                        )
+                            ) >= 0
                 },
                 {
                     "gl",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "gl"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "gl")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "gl"
+                                        )
+                            ) >= 0
                 },
                 { "gn", (mot) => mot.ToLower().IndexOf("gn") > 0 && !Terminaison(mot, "gn") },
                 {
                     "gr",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "gr"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "gr")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "gr"
+                                        )
+                            ) >= 0
                 },
                 {
                     "im",
@@ -2071,7 +2262,8 @@ namespace fr.avh.braille.dictionnaire
                     "in",
                     (mot) =>
                         mot.ToLower().StartsWith("in")
-                        || DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("in")) >= 0
+                        || DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("in"))
+                            >= 0
                 },
                 {
                     "ll",
@@ -2088,48 +2280,77 @@ namespace fr.avh.braille.dictionnaire
                 {
                     "oi",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("oi")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("oi"))
+                        >= 0
                 },
                 {
                     "om",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantConsonne(s, "om"))
-                            >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "om")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "om"
+                                        )
+                            ) >= 0
                         || Terminaison(mot, "om")
                 }, // Note : devant c. et t. (pas sur de ma regle ici)
                 {
                     "on",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("on")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("on"))
+                        >= 0
                 },
                 {
                     "or",
                     (mot) =>
                         mot.ToLower().Length > 2
                         && mot.ToLower().IndexOf("or") > 0
-                        && DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("or")) >= 0
+                        && DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("or"))
+                            >= 0
                 }, // Les signes pour an, eu, et or ne s'emploient pas isolément
                 {
                     "ou",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("ou")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("ou"))
+                        >= 0
                 },
                 {
                     "pl",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "pl"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "pl")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "pl"
+                                        )
+                            ) >= 0
                 },
                 {
                     "pr",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "pr"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "pr")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "pr"
+                                        )
+                            ) >= 0
                 },
                 {
                     "qu",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Contains("qu")) >= 0
+                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => s.Item2.Contains("qu"))
+                        >= 0
                 },
                 { "re", (mot) => mot.ToLower().IndexOf("re") == 0 && DevantConsonne(mot, "re") }, // Le signe pour re ne s'emploie qu'au début des mots, devant consonne (qu'il soit ou non une syllable entière)
                 {
@@ -2147,8 +2368,16 @@ namespace fr.avh.braille.dictionnaire
                 {
                     "tr",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantVoyelle(s, "tr"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantVoyelle(s.Item2, "tr")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantVoyelle(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "tr"
+                                        )
+                            ) >= 0
                 },
                 {
                     "tt",
@@ -2165,8 +2394,16 @@ namespace fr.avh.braille.dictionnaire
                 {
                     "ui",
                     (mot) =>
-                        DecoupageSyllabes(mot.ToLower()).FindIndex((s) => DevantConsonne(s, "ui"))
-                        >= 0
+                        DecoupageSyllabes(mot.ToLower())
+                            .FindIndex(
+                                (s) =>
+                                    DevantConsonne(s.Item2, "ui")
+                                    || s.Item1 + s.Item2.Length < mot.Length
+                                        && DevantConsonne(
+                                            mot.ToLower().Substring(s.Item1, s.Item2.Length + 1),
+                                            "ui"
+                                        )
+                            ) >= 0
                 },
             };
 
