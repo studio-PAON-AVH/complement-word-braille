@@ -15,8 +15,8 @@ using System.Security;
 [assembly: AssemblyCulture("")]
 [assembly: AssemblyDescriptionAttribute("Complément Word pour la préparation de document à la transcription en braille abrégé dans Duxburry DBT")]
 [assembly: AssemblyCopyrightAttribute("Copyright Association Valentin Haüy © 2024")]
-[assembly: AssemblyVersionAttribute("1.3.5.2")]
-[assembly: AssemblyFileVersionAttribute("1.3.5.2")]
+[assembly: AssemblyVersionAttribute("1.3.5.4")]
+[assembly: AssemblyFileVersionAttribute("1.3.5.4")]
 
 // L'affectation de la valeur false à ComVisible rend les types invisibles dans cet assembly 
 // aux composants COM.  Si vous devez accéder à un type dans cet assembly à partir de 

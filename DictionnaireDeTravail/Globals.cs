@@ -40,7 +40,12 @@ namespace fr.avh.braille.dictionnaire
             lock (LOGFILE) {
                 MessageLoggers?.Invoke(message);
                 if (logFile == null) {
-                    logFile = File.AppendText(LOGFILE);
+                    try {
+                        logFile = File.AppendText(LOGFILE);
+                    }
+                    catch (Exception) {
+                        logFile = File.AppendText(Path.Combine(AppData.FullName, "protection-"+Path.GetRandomFileName()+".log"));
+                    }
                 }
                 logFile.WriteLine(message);
                 logFile.Flush();
@@ -54,7 +59,12 @@ namespace fr.avh.braille.dictionnaire
             lock (LOGFILE) {
                 ExceptionLoggers?.Invoke(e);
                 if (logFile == null) {
-                    logFile = File.AppendText(LOGFILE);
+                    try {
+                        logFile = File.AppendText(LOGFILE);
+                    }
+                    catch (Exception) {
+                        logFile = File.AppendText(Path.Combine(AppData.FullName, "protection-" + Path.GetRandomFileName() + ".log"));
+                    }
                 }
                 logFile.WriteLine(e.Message);
                 logFile.Write(e.StackTrace);

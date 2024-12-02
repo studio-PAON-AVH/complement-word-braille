@@ -166,6 +166,7 @@
     <Reference Include="System.Data.SQLite.Linq, Version=1.0.119.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Data.SQLite.Linq.1.0.119.0\lib\net46\System.Data.SQLite.Linq.dll</HintPath>
     </Reference>
+    <Reference Include="System.Deployment" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.ServiceModel" />
     <Reference Include="System.Transactions" />
@@ -230,6 +231,7 @@
     can be found.
   -->
   <ItemGroup>
+    <Compile Include="AddinUpdater.cs" />
     <Compile Include="ProtectionWord.cs" />
     <Compile Include="FormulaireOptionsComplement.xaml.cs">
       <DependentUpon>FormulaireOptionsComplement.xaml</DependentUpon>
@@ -266,6 +268,7 @@
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="ProtectionInteractiveParMotsDialog.xaml.cs">
       <DependentUpon>ProtectionInteractiveParMotsDialog.xaml</DependentUpon>
@@ -279,6 +282,7 @@
     <Compile Include="ThisAddIn.cs">
       <SubType>Code</SubType>
     </Compile>
+    <None Include="README.md" />
     <None Include="ThisAddIn.Designer.xml">
       <DependentUpon>ThisAddIn.cs</DependentUpon>
     </None>

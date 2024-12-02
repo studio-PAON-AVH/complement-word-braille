@@ -13,6 +13,11 @@ using fr.avh.braille.addin;
 using Task = System.Threading.Tasks.Task;
 using fr.avh.archivage;
 using System.Threading.Tasks;
+using System.Deployment.Application;
+using System.Windows;
+using System.Net;
+using System.Windows.Forms;
+using System.Text.RegularExpressions;
 
 namespace fr.avh.braille.addin
 {
@@ -43,10 +48,10 @@ namespace fr.avh.braille.addin
             });
             
         }
-
-
+       
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
+            AddinUpdater.CheckForUpdate();
             // Sauvegarder le fichier DBTCodes.dic sur le disque de l'utilisateur
             //string dbtCodes = Properties.Resources.DBTCodes;
             //DirectoryInfo appData = fr.avh.braille.dictionnaire.Globals.AppData;
@@ -55,6 +60,7 @@ namespace fr.avh.braille.addin
             //    text.Write(dbtCodes);
             //}
             //this.Application.CustomDictionaries.Add(dbtCodesDicPath);
+
         }
 
 

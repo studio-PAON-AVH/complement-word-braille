@@ -110,6 +110,7 @@
   <ItemGroup>
     <Compile Include="TestAbreviation.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TestAddinUpdater.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -119,6 +120,10 @@
     <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ComplementWord\ComplementWord.csproj">
+      <Project>{2b33f161-6b4f-4097-8b82-2ca58efc9cee}</Project>
+      <Name>ComplementWord</Name>
+    </ProjectReference>
     <ProjectReference Include="..\DictionnaireDeTravail\DictionnaireDeTravail.csproj">
       <Project>{d6b3bb88-67e1-4cc5-a029-cd2b5fff25f7}</Project>
       <Name>DictionnaireDeTravail</Name>
