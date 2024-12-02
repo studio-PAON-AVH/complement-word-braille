@@ -97,7 +97,7 @@ namespace fr.avh.braille.dictionnaire
             Title = $"Édition du dictionnaire {Path.GetFileName(dictionnairePath)}";
             this.dictionnairePath = dictionnairePath;
             NameDictionnaire.Content = "Chargement ...";
-            DictionnaireDeTravail.FromDictionnaryFile(dictionnairePath)
+            DictionnaireDeTravail.FromDictionnaryFileJSON(dictionnairePath)
                 .ContinueWith((task) => {
                     dictionnaire = task.Result;
                     Dispatcher.Invoke(() =>
@@ -182,7 +182,7 @@ namespace fr.avh.braille.dictionnaire
                 protecteur?.AppliquerStatutSurOccurence(selected.Index, selected.Statut);
                 
                 if (this.dictionnairePath.Length > 0 && Directory.Exists(Path.GetDirectoryName(dictionnairePath))) {
-                    dictionnaire.Save(new DirectoryInfo(Path.GetDirectoryName(dictionnairePath)));
+                    dictionnaire.SaveJSON(new DirectoryInfo(Path.GetDirectoryName(dictionnairePath)));
                 }
             }
         }

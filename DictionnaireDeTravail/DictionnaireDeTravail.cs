@@ -1,5 +1,6 @@
 ﻿using fr.avh.braille.dictionnaire.Entities;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -356,33 +357,40 @@ namespace fr.avh.braille.dictionnaire
         }
 
         public static async Task<DictionnaireDeTravail> FromDictionnaryFileJSON(
-           string filePath,
-           CancellationTokenSource canceler = null
-       )
+            string filePath,
+            CancellationTokenSource canceler = null
+        )
         {
-            // Vérifier si l'opération a été annulée
             if (canceler != null && canceler.Token.IsCancellationRequested)
             {
                 return null;
             }
-
-            // Créer un nouveau dictionnaire de travail à partir du nom du fichier
             DictionnaireDeTravail result = new DictionnaireDeTravail(Path.GetFileName(filePath));
             Globals.logAsync($"Analyse de {result.NomDictionnaire}");
             Encoding utf8 = Encoding.UTF8;
 
-            // Ouvre le fichier en lecture avec l'encodage UTF-8
             using (StreamReader fileReader = new StreamReader(filePath, utf8))
             {
                 string jsonContent = await fileReader.ReadToEndAsync();
                 dynamic jsonObject = JsonConvert.DeserializeObject(jsonContent);
 
-                // Parcours de la liste des mots
                 foreach (var mot in jsonObject.mots)
                 {
                     string word = mot.Name;
                     Statut statut = (Statut)mot.Value.statut;
-                    List<int> occurences = mot.Value.occurences.ToObject<List<int>>();
+                    List<int> occurences = new List<int>();
+
+                    if (mot.Value.occurences is JArray)
+                    {
+                        occurences = mot.Value.occurences.ToObject<List<int>>();
+                    }
+                    else
+                    {
+                        foreach (var occurence in mot.Value.occurences)
+                        {
+                            occurences.Add((int)occurence);
+                        }
+                    }
                     foreach (int occurence in occurences)
                     {
                         result.Add(word, statut, position: occurence);
@@ -399,23 +407,45 @@ namespace fr.avh.braille.dictionnaire
         /// <param name="path"></param>
         public void SaveJSON(DirectoryInfo folder)
         {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string appDataPath = Environment.GetFolderPath(
+                Environment.SpecialFolder.ApplicationData
+            );
             var jsonObject = new
             {
                 version = "1.0",
-                nom = NomDictionnaire,
+                document = NomDictionnaire,
+                mot_courant = Occurences.FirstOrDefault(),
                 mots = CarteMotOccurences.ToDictionary(
                     kvp => kvp.Key,
-                    kvp => new
+                    kvp =>
                     {
-                        statut = StatutMot(kvp.Key),
-                        occurences = kvp.Value
+                        // Calculer le statut le plus fréquent
+                        var statutFrequent = kvp.Value
+                            .GroupBy(index => StatutsOccurences[index])
+                            .OrderByDescending(group => group.Count())
+                            .First()
+                            .Key;
+
+                        var occurences = kvp.Value
+                        .Where(index => StatutsOccurences[index] != statutFrequent)
+                        .ToDictionary(
+                            index => index.ToString(),
+                            index => (int)StatutsOccurences[index]
+                        );
+
+                        return new { statut = (int)statutFrequent, occurences };
                     }
                 ),
             };
-            string jsonContent = JsonConvert.SerializeObject(jsonObject, Newtonsoft.Json.Formatting.Indented);
+            string jsonContent = JsonConvert.SerializeObject(
+                jsonObject,
+                Newtonsoft.Json.Formatting.Indented
+            );
             string cleanedNomDictionnaire = NomDictionnaire.Replace(".bdic", "");
-            File.WriteAllText(Path.Combine(appDataPath, cleanedNomDictionnaire + ".json"), jsonContent);
+            File.WriteAllText(
+                Path.Combine(appDataPath, cleanedNomDictionnaire + ".json"),
+                jsonContent
+            );
         }
     }
 }
