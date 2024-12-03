@@ -287,7 +287,7 @@ namespace fr.avh.braille.addin
                             new Tuple<int, int>(0, baseStepNumber)
                         );
                         System.Threading.Tasks.Task<DictionnaireDeTravail> init =
-                            DictionnaireDeTravail.FromDictionnaryFile(WorkingDictionnaryPath);
+                            DictionnaireDeTravail.FromDictionnaryFileJSON(WorkingDictionnaryPath);
                         init.Wait();
                         existingDictionnary = init.Result;
                         info?.Invoke(
@@ -1174,7 +1174,7 @@ namespace fr.avh.braille.addin
 
         public void Save()
         {
-            this.WorkingDictionnary.Save(
+            this.WorkingDictionnary.SaveJSON(
                 new DirectoryInfo(Path.GetDirectoryName(WorkingDictionnaryPath))
             );
             if (File.Exists(ResumePath))

@@ -356,6 +356,12 @@ namespace fr.avh.braille.dictionnaire
             }
         }
 
+        /// <summary>
+        /// Charger un dictionnaire depuis un fichier JSON
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <param name="canceler"></param>
+        /// <returns></returns>
         public static async Task<DictionnaireDeTravail> FromDictionnaryFileJSON(
             string filePath,
             CancellationTokenSource canceler = null
@@ -402,14 +408,11 @@ namespace fr.avh.braille.dictionnaire
         }
 
         /// <summary>
-        /// Sauvegarder sur le disque
+        /// Sauvegarder sur le disque en format JSON
         /// </summary>
         /// <param name="path"></param>
         public void SaveJSON(DirectoryInfo folder)
         {
-            string appDataPath = Environment.GetFolderPath(
-                Environment.SpecialFolder.ApplicationData
-            );
             var jsonObject = new
             {
                 version = "1.0",
@@ -426,6 +429,7 @@ namespace fr.avh.braille.dictionnaire
                             .First()
                             .Key;
 
+                        // Créer un dictionnaire des occurences en excluant les occurences avec le statut le plus fréquent
                         var occurences = kvp.Value
                         .Where(index => StatutsOccurences[index] != statutFrequent)
                         .ToDictionary(
@@ -443,7 +447,7 @@ namespace fr.avh.braille.dictionnaire
             );
             string cleanedNomDictionnaire = NomDictionnaire.Replace(".bdic", "");
             File.WriteAllText(
-                Path.Combine(appDataPath, cleanedNomDictionnaire + ".json"),
+                Path.Combine(folder.FullName, cleanedNomDictionnaire + ".json"),
                 jsonContent
             );
         }
