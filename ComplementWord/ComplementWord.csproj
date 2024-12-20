@@ -232,6 +232,7 @@
   -->
   <ItemGroup>
     <Compile Include="AddinUpdater.cs" />
+    <Compile Include="OptionsComplement.cs" />
     <Compile Include="ProtectionWord.cs" />
     <Compile Include="FormulaireOptionsComplement.xaml.cs">
       <DependentUpon>FormulaireOptionsComplement.xaml</DependentUpon>
