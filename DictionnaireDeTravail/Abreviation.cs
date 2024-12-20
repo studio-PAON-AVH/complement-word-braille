@@ -959,6 +959,7 @@ namespace fr.avh.braille.dictionnaire
         // Note : a l'exception de in, les signes abrégeant des groupes de lettres ne sont utilisables que sur des lettres appartenant
         // a une meme syllabe
         // possiblement besoin de découper le mot en syllabes pour certaines abbréviation
+        public static readonly string[] TERMINAISON = { "e", "s", "es", };
 
         public static string regleAppliquerSur(string mot)
         {
@@ -968,11 +969,16 @@ namespace fr.avh.braille.dictionnaire
             foreach (var abbr in MotsAbreger)
             {
                 string temp = cleanedup;
-                if (temp.ToLower().EndsWith("s") && !abbr.EndsWith("s"))
-                    temp = temp.Substring(0, mot.Length - 1);
+
+                int ending = TERMINAISON.ToList().FindIndex(
+                    t => temp.EndsWith(t) 
+                    && !abbr.EndsWith(t)
+                    && abbr.Length == (temp.Length - t.Length)
+                );
+                if (ending >= 0)
+                    temp = temp.Substring(0, mot.Length - TERMINAISON[ending].Length);
                 if (abbr == temp)
                 {
-                    //Console.WriteLine("Mot abrégeable trouvé depuis la liste : " + abbr);
                     return temp;
                 }
             }
@@ -1012,8 +1018,13 @@ namespace fr.avh.braille.dictionnaire
             foreach (var abbr in MotsAbreger)
             {
                 string temp = cleanedup;
-                if (temp.ToLower().EndsWith("s") && !abbr.EndsWith("s"))
-                    temp = temp.Substring(0, mot.Length - 1);
+                int ending = TERMINAISON.ToList().FindIndex(
+                    t => temp.EndsWith(t)
+                    && !abbr.EndsWith(t)
+                    && abbr.Length == (temp.Length - t.Length)
+                );
+                if (ending >= 0)
+                    temp = temp.Substring(0, mot.Length - TERMINAISON[ending].Length);
                 if (abbr == temp)
                 {
                     //Console.WriteLine("Mot abrégeable trouvé depuis la liste : " + abbr);
@@ -1044,6 +1055,7 @@ namespace fr.avh.braille.dictionnaire
             "ch",
             "ph",
             "th",
+            "gh",
             "gn",
             "br",
             "cr",

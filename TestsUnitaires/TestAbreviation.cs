@@ -77,7 +77,11 @@ namespace fr.avh.braille.tests
         [DataRow("you", true)]
         [DataRow("Henri", true)]
         [DataRow("Colombie", true)]
-        public void MotsEsAbregeable(string mot, bool expected)
+        [DataRow("Arléa", true)]
+        [DataRow("Braille", true)]
+        [DataRow("Brailles", true)]
+        [DataRow("Volontées", true)]
+        public void MotsAbregeables(string mot, bool expected)
         {
             Console.WriteLine("Détection et syllabes : {0} ", Abreviation.regleAppliquerSur(mot));
             Assert.AreEqual(
@@ -119,7 +123,7 @@ namespace fr.avh.braille.tests
         [DataRow("Stazione", false)]
         [DataRow("successful", false)]
         [DataRow("Witness", false)]
-        public void MotsEsNonAbregeable(string mot, bool expected)
+        public void MotsNonAbregeables(string mot, bool expected)
         {
             Console.WriteLine("Détection et syllabes : {0} ", Abreviation.regleAppliquerSur(mot));
             Assert.AreEqual(
