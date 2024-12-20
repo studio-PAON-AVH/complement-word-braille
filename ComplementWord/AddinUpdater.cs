@@ -37,8 +37,11 @@ namespace fr.avh.braille.addin
         public static void CheckForUpdate()
         {
             System.Version version = GetVersion();
-            if (version != new System.Version(0, 0, 0, 0)) { // eviter les tests de maj en mode debug
-            //if(true) { // test en mode debug
+            DateTime current = DateTime.Now;
+            TimeSpan lastCheck = current - OptionsComplement.Instance.LastUpdateCheck;
+            if (version != new System.Version(0, 0, 0, 0) && lastCheck > TimeSpan.FromDays(1)) {
+                OptionsComplement.Instance.LastUpdateCheck = current;
+                OptionsComplement.Instance.Sauvegarder();
                 // Test de disponisibilité d'une mise à jour
                 try {
                     string sourceURL = Properties.Settings.Default.UpdateUrl;
@@ -67,11 +70,9 @@ namespace fr.avh.braille.addin
                         );
                         if (dr == MessageBoxResult.OK)
                             System.Diagnostics.Process.Start(Properties.Settings.Default.UpdateUrl);
-
                     } else {
                         //MessageBox.Show("Your already have the latest version of the plugin.", "SaveAsDAISY", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
-
                 }
                 catch (Exception e) {
                     // Pas de vérification de mise à jour
