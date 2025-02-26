@@ -264,6 +264,7 @@ namespace fr.avh.braille.addin
             {
                 _document = document;
                 AnalyserDocument();
+                ProtegerPhrasesEtrangere();
             }
             else
             {
@@ -1391,6 +1392,56 @@ namespace fr.avh.braille.addin
                 wordRange.Select();
             }
             return wordRange;
+        }
+
+        public void ProtegerPhrasesEtrangere()
+        {
+            List<string> phrasesEtrangers = new List<string>();
+            List<MSWord.Range> currentPhrase = new List<MSWord.Range>();
+            bool isInCode = false;
+
+            try
+            {
+                foreach (MSWord.Range w in _document.Words)
+                {
+                    w.DetectLanguage();
+                    string text = w.Text;
+
+                    isInCode = (text.StartsWith("[[*") || text.EndsWith("[[*")) ? true : (text.EndsWith("*]]") ? false : isInCode);
+
+                    if (w.LanguageID != MSWord.WdLanguageID.wdFrench)
+                    {
+                        currentPhrase.Add(w);
+                    }
+                    else
+                    {
+                        if (currentPhrase.Count > 0)
+                        {
+                            // Ajouter les codes de protection G1 et G2 autour de la phrase étrangère
+                            MSWord.Range phraseRange = _document.Range(currentPhrase.First().Start, currentPhrase.Last().End);
+                            if (!phraseRange.Text.StartsWith(PROTECTION_CODE_G1))
+                            {
+                                phraseRange.InsertBefore(PROTECTION_CODE_G1);
+                            }
+                            if (!phraseRange.Text.EndsWith(PROTECTION_CODE_G2))
+                            {
+                                phraseRange.InsertAfter(PROTECTION_CODE_G2);
+                            }
+                            phrasesEtrangers.Add(phraseRange.Text.Trim());
+                            currentPhrase.Clear();
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(
+                    "Impossible de procéder à la détection des phrases étrangères : \r\n"
+                    + e.Message
+                    + "\r\n"
+                    + "Veuillez installer une langue de vérification supplémentaire (Options > Langue > Langue de création et de vérification > Ajouter)"
+                );
+            }
         }
 
         public static bool EstProteger(MSWord.Document current, MSWord.Range wordRange)
