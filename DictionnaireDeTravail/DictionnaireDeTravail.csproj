@@ -106,6 +106,7 @@
       <DependentUpon>Importer.xaml</DependentUpon>
     </Compile>
     <Compile Include="IProtection.cs" />
+    <Compile Include="Lexique\LexiqueFrance.cs" />
     <Compile Include="Mappings\DictionnaireMap.cs" />
     <Compile Include="Mappings\MotMap.cs" />
     <Compile Include="AnalyseurDeDictionnaires.cs" />
@@ -122,6 +123,9 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <EmbeddedResource Include="Lexique\lexique_ambigus.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -273,6 +277,15 @@
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Migrations\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
+    <EmbeddedResource Include="Lexique\megalexique-braille.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
