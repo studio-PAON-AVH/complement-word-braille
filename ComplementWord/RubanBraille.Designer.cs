@@ -53,6 +53,7 @@
             this.AbregerSelection = this.Factory.CreateRibbonButton();
             this.Options = this.Factory.CreateRibbonGroup();
             this.OuvrirOptions = this.Factory.CreateRibbonButton();
+            this.TestsButton = this.Factory.CreateRibbonButton();
             this.protectorRibbonAVH.SuspendLayout();
             this.BrailleActions.SuspendLayout();
             this.InfoSelection.SuspendLayout();
@@ -194,6 +195,7 @@
             // Options
             // 
             this.Options.Items.Add(this.OuvrirOptions);
+            this.Options.Items.Add(this.TestsButton);
             this.Options.Label = "Options";
             this.Options.Name = "Options";
             // 
@@ -204,6 +206,14 @@
             this.OuvrirOptions.Name = "OuvrirOptions";
             this.OuvrirOptions.ShowImage = true;
             this.OuvrirOptions.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.OuvrirOptions_Click);
+            // 
+            // TestsButton
+            // 
+            this.TestsButton.ControlSize = Microsoft.Office.Core.RibbonControlSize.RibbonControlSizeLarge;
+            this.TestsButton.Label = "Tests";
+            this.TestsButton.Name = "TestsButton";
+            this.TestsButton.ShowImage = true;
+            this.TestsButton.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.TestsButton_Click);
             // 
             // RubanBraille
             // 
@@ -250,6 +260,7 @@
         internal Microsoft.Office.Tools.Ribbon.RibbonButton AbregerSelection;
         internal Microsoft.Office.Tools.Ribbon.RibbonGroup Options;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton OuvrirOptions;
+        internal Microsoft.Office.Tools.Ribbon.RibbonButton TestsButton;
     }
 
     partial class ThisRibbonCollection

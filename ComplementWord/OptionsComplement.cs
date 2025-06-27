@@ -28,10 +28,15 @@ namespace fr.avh.braille.addin
                 if (preprotec != null) {
                     ActiverPreProtectionAuto = bool.Parse(preprotec.InnerText);
                 }
-                XmlNode lastUpdateCheck = config.GetElementsByTagName("lastupdatecheck").Item(0);
-                if (lastUpdateCheck != null) {
-                    LastUpdateCheck = DateTime.Parse(preprotec.InnerText);
+                try {
+                    XmlNode lastUpdateCheck = config.GetElementsByTagName("lastupdatecheck").Item(0);
+                    if (lastUpdateCheck != null) {
+                        LastUpdateCheck = DateTime.Parse(preprotec.InnerText);
+                    }
+                } catch (Exception e) {
+                    //ActiverPreProtectionAuto = false;
                 }
+                
             }
         }
 

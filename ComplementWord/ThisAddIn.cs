@@ -1,29 +1,13 @@
 ﻿using System;
-using System.IO;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Xml.Linq;
-using Word = Microsoft.Office.Interop.Word;
-using Office = Microsoft.Office.Core;
-using Microsoft.Office.Tools.Word;
-using Microsoft.Office.Interop.Word;
-using Microsoft.Office.Core;
-using fr.avh.braille.addin;
 using Task = System.Threading.Tasks.Task;
 using fr.avh.archivage;
 using System.Threading.Tasks;
-using System.Deployment.Application;
-using System.Windows;
-using System.Net;
-using System.Windows.Forms;
-using System.Text.RegularExpressions;
 
 namespace fr.avh.braille.addin
 {
     public partial class ThisAddIn
     {
-
         public Dictionary<string, ProtectionWord> documentProtection = new Dictionary<string, ProtectionWord>();
 
         public Task<ProtectionWord> AnalyzeCurrentDocument(Utils.OnInfoCallback info, Utils.OnErrorCallback error)
@@ -49,9 +33,20 @@ namespace fr.avh.braille.addin
             
         }
        
+        //private BrailleTaskPaneHolder _brailleTaskPane;
+        //private Microsoft.Office.Tools.CustomTaskPane _myCustomTaskPane;
+
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
             AddinUpdater.CheckForUpdate();
+            // Pour plus tard : remplacer la fenêtre du journal pas un task pane qui hébergera le calcul pour le document courant
+            // 
+            //_brailleTaskPane = new BrailleTaskPaneHolder();
+            //_myCustomTaskPane = this.CustomTaskPanes.Add(
+            //    _brailleTaskPane,
+            //    "Traitement du braille"
+            //);
+            //_myCustomTaskPane.Visible = true;
             // Sauvegarder le fichier DBTCodes.dic sur le disque de l'utilisateur
             //string dbtCodes = Properties.Resources.DBTCodes;
             //DirectoryInfo appData = fr.avh.braille.dictionnaire.Globals.AppData;
@@ -61,6 +56,11 @@ namespace fr.avh.braille.addin
             //}
             //this.Application.CustomDictionaries.Add(dbtCodesDicPath);
 
+        }
+
+        private void ThisAddin_DocumentChange()
+        {
+            // TODO : lors d'un changement de document, charger les données d'analyse correspondante dans le taskpane
         }
 
 

@@ -67,11 +67,23 @@ namespace fr.avh.braille.addin.Properties {
         ///[[*sk2*]]
         ///[[*&lt;*]]
         ///[[*&gt;*]]
-        ///[[*sc1:0*]]
-        ///[[*hi5:3:0:2:2*]]
+        ///[[*sc1:0 *]]
+        ///[[*hi5:3:0:2:2 *]]
         ///[[*hi*]]
         ///[[*sc1:0:0*]]
-        ///.
+        ///i
+        ///pg
+        ///pv-1
+        ///sk2
+        ///&lt;
+        ///&gt;
+        ///sc1:0
+        ///hi5:3:0:2:2
+        ///hi
+        ///sc1:0:0
+        ///sk-9
+        ///sk-3
+        ///sk-1.
         /// </summary>
         internal static string DBTCodes {
             get {
