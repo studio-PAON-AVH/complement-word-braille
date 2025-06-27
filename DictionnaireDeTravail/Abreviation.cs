@@ -1,7 +1,9 @@
-﻿using System;
+﻿
+using fr.avh.archivage;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace fr.avh.braille.dictionnaire
@@ -17,7 +19,7 @@ namespace fr.avh.braille.dictionnaire
         /// Liste des mots abréger extrait du manuel de braille abrégé de l'AVH :
         /// https://www.avh.asso.fr/sites/default/files/manuel_abrege2013_complet_noir_0.pdf
         /// </summary>
-        public static readonly List<string> MotsAbreger = new List<string>
+        public static readonly HashSet<string> MotsAbreger = new HashSet<string>
         {
             "absolu",
             "absolument",
@@ -953,15 +955,14 @@ namespace fr.avh.braille.dictionnaire
         // t. = terminaison (fin de mot)
         // Si rien, abréviation employable n'importe quand
 
-        public static readonly string VOYELLES = "aeiouyàáâãäåæèéêëìíîïðòóôõöøùúûüýœ";
-        public static readonly string CONSONNES = "bcdfghjklmnpqrstvwxzçñ";
-
+        public static readonly string VOYELLES = "aeiouyàáâãäåæèéêëęìíîïðòóôõöøùúûüýÿœ";
+        public static readonly string CONSONNES = "bcdfghjklmnpqrstvwxzçčłñṇšṣṭžẓ";
         // Note : a l'exception de in, les signes abrégeant des groupes de lettres ne sont utilisables que sur des lettres appartenant
         // a une meme syllabe
         // possiblement besoin de découper le mot en syllabes pour certaines abbréviation
         public static readonly string[] TERMINAISON = { "e", "s", "es", };
 
-        public static string regleAppliquerSur(string mot)
+        public static string RegleAppliquerSur(string mot)
         {
             string cleanedup = mot.ToLower().Trim();
             if (cleanedup.Length < 2)
@@ -1050,7 +1051,7 @@ namespace fr.avh.braille.dictionnaire
             return false;
         }
 
-        private static readonly List<string> CONSONNESINCASSABLE = new List<string>
+        private static readonly HashSet<string> CONSONNESINCASSABLE = new HashSet<string>
         {
             "ch",
             "ph",
@@ -1073,7 +1074,7 @@ namespace fr.avh.braille.dictionnaire
             "pl"
         };
 
-        private static readonly List<string> PREFIXES = new List<string>
+        private static readonly HashSet<string> PREFIXES = new HashSet<string>
         {
             "acantho", //épine	acanthacées, acanthe
             "lomb", //région lombaire	lombalgie
@@ -1587,7 +1588,7 @@ namespace fr.avh.braille.dictionnaire
             .OrderBy(p => p)
             .OrderBy(p => p.Length)
             .Reverse()
-            .ToList();
+            .ToHashSet();
 
         /// <summary>
         /// Test si un préfixe est présent dans un mot avant un indice donné
@@ -2455,5 +2456,198 @@ namespace fr.avh.braille.dictionnaire
         //     tous les signes conservent leur valeur alphabétique.
         //     Il doit être employé chaque fois qu'il peut y avoir confusion sur la valeur alphabétique
         //     ou abréviative à attribuer à un ou plusieurs signes du mot
+
+        //TODO : Les mots abregeable qui ne sont pas dans le "glaff abregeable" peuvent être considérés comme "potentiellement étrangés au français"
+
+        
+
+        #region Analyseur de texte
+
+        private static readonly string MIN = "a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý";
+        private static readonly string MAJ = "A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ";
+        private static readonly string NUM = "0-9";
+        private static readonly string ALPHANUM = $"{MIN}{MAJ}{NUM}_"; // == a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüýA-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ0-9_
+        private static readonly string REG_CS = "\\[\\[\\*"; // Debut de code duxburry
+        private static readonly string REG_CE = "\\*\\]\\]"; // Fin de code duxburry
+        //private static readonly string WORD_WITH_NUMBERS_PATTERN =
+        //    $"({REG_CS}i{REG_CE})?"
+        //    + // Code duxburry de protection optionnel (récupérer dans le groupe 1) (0 ou 1)
+        //    $"(?<!{REG_CS})"
+        //    + // Negative lookbehind (ne pas match le texte commençant par un indicateur de code duxburry)
+        //    $"("
+        //    + $"\\b"
+        //    + // Debut de mot (word boundary)
+        //    $"[{NUM}{MIN}{MAJ}]*"
+        //    + // Chiffre ou lettre (0 ou n)
+        //    $"("
+        //    + $"[{MIN}{MAJ}][{NUM}]"
+        //    + // Lettre suivie d'un chiffre
+        //    $"|"
+        //    + $"[{NUM}][{MIN}{MAJ}]"
+        //    + // Chiffre suivie d'une lettre
+        //    $")+"
+        //    + // Motif Chiffre+Lettre ou lettre+chiffre (1 ou n)
+        //    $"[{NUM}{MIN}{MAJ}]*"
+        //    + // suivi de chiffres ou de lettres (0 ou n)
+        //    $"(?!{REG_CE})"
+        //    + // Negative lookahead (ne pas match de texte suivi d'une fin de code duxburry)
+        //    $"\\b"
+        //    + // Fin de mot (word boundary)
+        //    $")";
+
+
+        ///// <summary>
+        ///// Motif de recherche de mots contenant au moins 1 majuscule : <br/>
+        ///// = début de ligne ou caractère non alphanumérique,<br/>
+        ///// puis optionnellement suivi d'un code de protection,<br/>
+        ///// puis optionnellement suivi d'un groupe contenant <br/>
+        /////    0 ou N caractère majuscule ou minuscule,<br/>
+        /////    suivi d'un groupe contenant au choix<br/>
+        /////    - soit une ou plusieurs (minuscules ou majuscule ou tiret) suivie d'une majuscule<br/>
+        /////    - soit une majuscule suivi d'une ou plusieurs(minuscules ou majuscule ou tiret) <br/>
+        /////    suivi de 0 ou N caractère minuscule, majuscule, underscore ou tiret<br/>
+        /////    et suivi d'un caractère (non alphanumérique y compris sans apostrophe pour éviter les prefix en Qu' et C') ou de la fin de ligne
+        ///// </summary>
+        //private static readonly string WORD_WITH_CAPITAL_PATTERN =
+        //    $"(?<=[^{ALPHANUM}-]|^)" // group 1 linestart or non alphanum character
+        //    + $"({REG_CS}i{REG_CE})?" // group 2 Optional protection code
+        //    + $"(" // group 3 : searched word
+        //    + $"[{MIN}{MAJ}_-]*" // optionnal prefix
+        //    + $"(" // Group 4: one or more capital letters and at least one other letter
+        //    + $"[{MIN}{MAJ}-]+[{MAJ}]"
+        //    + $"|[{MAJ}][{MIN}{MAJ}-]+"
+        //    + $")" // end group 4
+        //    + $"[{MIN}{MAJ}_-]*" // optionnal suffix
+        //    + $")+" // end group 3
+        //    + $"(?=[^{ALPHANUM}'’-]|$)"; // group 5 separator (non alphanum character, no apostrophes, or end of line)
+
+        /// <summary>
+        /// Motif de recherche de mot(s)
+        /// </summary>
+        /// <param name="pattern"></param>
+        /// <param name="opts"></param>
+        /// <returns>
+        /// Regex with
+        /// - Group 1 : Code de protection optionnel
+        /// - Group 2 : Motif détecté
+        /// </returns>
+        public static Regex SearchWord(string pattern, RegexOptions opts)
+        {
+            return new Regex(
+                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE})?({pattern})(?=[^{ALPHANUM}@'’-]|$)",
+                RegexOptions.Compiled | opts
+            );
+        }
+
+        ///// <summary>
+        ///// Recherche des mots contenant un chiffre <br/>
+        ///// (lettre minuscule ou majuscul précédé ou suivi d'un chiffre)<br/>
+        ///// Goupes :<br/>
+        ///// - [1] : recup du code de protection s'il existe<br/>
+        ///// - [2] : le mot contenant un ou plusieurs nombre
+        /////
+        ///// </summary>
+        //private static readonly Regex WORD_WITH_NUMBERS = new Regex(
+        //    WORD_WITH_NUMBERS_PATTERN,
+        //    RegexOptions.Compiled | RegexOptions.Singleline
+        //);
+
+        ///// <summary>
+        ///// Recherche tous les mots contenant au moins une majuscule
+        ///// Goupes :<br/>
+        ///// - [1] : recup du code de protection s'il existe<br/>
+        ///// - [2] : le mot contenant une ou plusieurs majuscules
+        ///// </summary>
+        //private static readonly Regex WORD_WITH_CAPITAL = new Regex(
+        //    WORD_WITH_CAPITAL_PATTERN,
+        //    RegexOptions.Compiled | RegexOptions.Singleline
+        //);
+
+
+        /// <summary>
+        /// Expression de recherche de mots (contenant au moins une majuscule ou une minuscule) hors code duxburry
+        /// </summary>
+        private static readonly Regex WORDS = new Regex(
+                $"(?<=[^{ALPHANUM}-]|^)(\\[\\[\\*i\\*\\]\\])?(?<!{REG_CS})([{ALPHANUM}_-]*[{MIN}{MAJ}][{ALPHANUM}_-]*)(?=[^{ALPHANUM}'’-@]|$)",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline
+            );
+
+        public class OccurenceATraiter
+        {
+            public string Mot { get; set; }
+            public int Index { get; set; }
+            public bool EstDejaProteger { get; set; }
+            public bool ContientDesChiffres { get; set; }
+            public bool ContientDesMajuscules { get; set; }
+            public bool EstAbregeable { get; set; }
+            public bool EstFrançaisAbregeable { get; set; }
+            public bool EstAmbigu { get; set; }
+            public OccurenceATraiter(string mot, int index, bool estDejaProteger, bool contientDesChiffres = false, bool estAbregeable = false, bool estFrancais = false, bool estAmbigu = false)
+            {
+                Mot = mot;
+                Index = index;
+                ContientDesChiffres = contientDesChiffres;
+                ContientDesMajuscules = contientDesChiffres;
+                EstDejaProteger = estDejaProteger;
+                EstAbregeable = estAbregeable;
+                EstFrançaisAbregeable = estFrancais;
+                EstAmbigu = estAmbigu;
+            }
+
+
+        }
+
+
+        public static async Task<Dictionary<int,OccurenceATraiter>> AnalyserTexte(string texteAAnalyser, Utils.OnInfoCallback info = null)
+        {
+            Dictionary<int,OccurenceATraiter> motsAnalyses = new Dictionary<int,OccurenceATraiter>();
+            MatchCollection result = WORDS.Matches(texteAAnalyser);
+            if (result.Count > 0) {
+                info?.Invoke($"Analyse des mots {result.Count} mots du document", new Tuple<int, int>(0, result.Count));
+                List<Task<OccurenceATraiter>> tasks = new List<Task<OccurenceATraiter>>();
+                int i = 1;
+                foreach (Match item in result) {
+                    bool isAlreadyProtected = item.Groups[1].Success;
+                    string foundWord = item.Groups[2].Value.Trim();
+                    int pos = item.Groups[2].Index;
+                    string wordKey = foundWord.ToLower();
+                    tasks.Add(Task.Run(() =>
+                    {
+                        var res = new OccurenceATraiter(foundWord, pos, isAlreadyProtected)
+                        {
+                            ContientDesChiffres = Regex.Match(foundWord, $"[{NUM}]").Success,
+                            ContientDesMajuscules = Regex.Match(foundWord,$"[{MAJ}]").Success,
+                            EstAbregeable = EstAbregeable(wordKey),
+                            EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
+                            EstAmbigu = LexiqueFrance.EstAmbigu(wordKey)
+                        };
+                        info?.Invoke(
+                            "",
+                            new Tuple<int, int>(i++, result.Count)
+                        );
+                        return res;
+                    }));
+                }
+
+                try {
+                    OccurenceATraiter[] tests = await Task.WhenAll(tasks);
+                    foreach (OccurenceATraiter testMot in tests) {
+                        motsAnalyses.Add(testMot.Index, testMot);
+                    }
+                }
+                catch (Exception e) {
+                    throw new Exception("Erreur lors de l'analyse des mots", e);
+                }
+            }
+            return motsAnalyses;
+        }
+
+
+        // TODO : pour limiter le temps de traitement, plutot que de passer 2 fois sur la liste des mots identifiés,
+        // récupérer en un seul traitement sur chaque mot si le mot est un mot ambigu ou hors lexique
+
+        #endregion
+
+
     }
 }

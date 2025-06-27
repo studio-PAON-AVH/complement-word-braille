@@ -118,12 +118,13 @@ namespace fr.avh.braille.dictionnaire
             // Le mot appartient au lexique si 
             // 1. il est présent dans le lexique
             // 2. ou s'il est au pluriel et que le singulier est présent dans le lexique
-            // 3. ou si c'est un mot composé, si tous les sous-mots sont présents dans le lexique
+            // 3. ou si c'est un mot composé, si l'un des sous-mots est présents dans le lexique
+            // (pour le cas ou le lexique ne comporte pas le mot composé, i.e. porte à porte
             return LexiqueAbreger.Value.Contains(m)
                 || (
                     m.EndsWith("s") ? LexiqueAbreger.Value.Contains(m.Substring(0, m.Length - 1)) : false
                 )
-                || decomposed.All(p =>
+                || decomposed.Any(p =>
                     LexiqueAbreger.Value.Contains(p)
                     || (p.EndsWith("s") ? LexiqueAbreger.Value.Contains(p.Substring(0, p.Length - 1)) : false)
                  );
@@ -138,20 +139,7 @@ namespace fr.avh.braille.dictionnaire
         public static bool EstAmbigu(string mot)
         {
             string m = mot.ToLower().Trim();
-            List<string> decomposed = m.Split(new[] { '-' }).ToList();
-
-            // Le mot appartient au lexique si 
-            // 1. il est présent dans le lexique
-            // 2. ou s'il est au pluriel et que le singulier est présent dans le lexique
-            // 3. ou si c'est un mot composé, si tous les sous-mots sont présents dans le lexique
-            return LexiqueAmbigu.Value.Keys.Contains(m)
-                || (
-                    m.EndsWith("s") ? LexiqueAmbigu.Value.Keys.Contains(m.Substring(0, m.Length - 1)) : false
-                )
-                || decomposed.All(p =>
-                    LexiqueAmbigu.Value.Keys.Contains(p)
-                    || (p.EndsWith("s") ? LexiqueAmbigu.Value.Keys.Contains(p.Substring(0, p.Length - 1)) : false)
-                 );
+            return LexiqueAmbigu.Value.Keys.Contains(m);
         }
 
     }
