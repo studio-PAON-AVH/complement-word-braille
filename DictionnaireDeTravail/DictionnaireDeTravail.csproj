@@ -112,6 +112,7 @@
     <Compile Include="Mappings\DictionnaireMap.cs" />
     <Compile Include="Mappings\MotMap.cs" />
     <Compile Include="AnalyseurDeDictionnaires.cs" />
+    <Compile Include="MotAfficher.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Statut.cs" />
     <Compile Include="Utils.cs" />
