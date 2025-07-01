@@ -1,0 +1,71 @@
+﻿<Window x:Class="fr.avh.braille.addin.ListeMotsHorsLexique"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:fr.avh.braille.addin"
+        mc:Ignorable="d"
+        Title="Liste des mots hors lexique"
+        d:DesignHeight="450"
+        d:DesignWidth="800"
+        GotFocus="Window_GotFocus">
+    <Grid>
+        <Label Margin="5" Content="Cliquez sur une ligne du tableau pour la resélectionner dans le document" />
+        <DataGrid x:Name="VueOccurences"
+                  AutoGenerateColumns="False"
+                  ItemsSource="{Binding Path=.}"
+                  Margin="5,41,5,5"
+                  CanUserAddRows="false"
+                  AlternatingRowBackground="WhiteSmoke"
+                  RowBackground="White"
+                  BorderBrush="Transparent"
+                  GridLinesVisibility="None"
+                  SelectionChanged="VueOccurences_SelectionChanged">
+            <DataGrid.Resources>
+                <Style TargetType="{x:Type DataGridCell}">
+                    <Setter Property="Margin"
+                            Value="10,0" />
+                </Style>
+            </DataGrid.Resources>
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="FontWeight"
+                            Value="Bold" />
+                    <Setter Property="Padding"
+                            Value="5,0,0,0" />
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Width="130">
+                    <DataGridTemplateColumn.Header>
+                        <Label Content="Statut" />
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Label Content="{Binding Path=StatutChoisi}" />
+                            <!--<ComboBox ItemsSource="{Binding Path=StatutsPossible}"
+                                      Width="100"
+                                      SelectedValue="{Binding Path=StatutChoisi}"
+                                      SelectionChanged="Statut_SelectionChanged" />-->
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Width="*">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="Occurences dans le document" />
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Margin="10,0,0,0">
+                <Run Text="{Binding Path=ContexteAvant}" />
+                <Run Text="{Binding Path=Texte}"
+                                FontWeight="Bold" />
+                <Run Text="{Binding Path=ContexteApres}" />
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Window>

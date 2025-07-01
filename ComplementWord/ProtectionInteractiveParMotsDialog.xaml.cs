@@ -81,19 +81,21 @@ namespace fr.avh.braille.addin
         {
             InitializeComponent();
             this.protecteur = protecteur;
+
+            
             StatusFilter.ItemsSource = SelectionStatus;
 
             //MotsSelectionnable = protecteur.DonneesTraitement.CarteMotOccurences.Keys.ToList();
             //MotsSelectionnable.Sort();
             //SelecteurMot.ItemsSource = MotsSelectionnable;
 
-            int selectable = protecteur.DonneesTraitement.CarteMotOccurences[protecteur.SelectedWord].FindIndex(
+            int selectable = protecteur.DonneesTraitement.CarteMotOccurences[protecteur.MotSelectionne].FindIndex(
                 o => StatutsAfficher.Contains(protecteur.DonneesTraitement.StatutsOccurences[o])
             );
 
             // Sélectionner la premiere occurence affiché, ou la premiere occurence du mot si aucune occurrence 
             // ne correspond aux filtres
-            Range next = protecteur.SelectionnerOccurenceMot(protecteur.SelectedWord, Math.Max(0, selectable));
+            Range next = protecteur.SelectionnerOccurenceMot(protecteur.MotSelectionne, Math.Max(0, selectable));
             RechargerFenetre();
             next.Select();
         }
@@ -109,7 +111,7 @@ namespace fr.avh.braille.addin
             bool hasStatutNonAppliquer = false;
             do {
                 List<int> occurenceMot = protecteur.DonneesTraitement.CarteMotOccurences[
-                    protecteur.SelectedWord
+                    protecteur.MotSelectionne
                 ];
                 for(int i = 0; i < occurenceMot.Count && !hasStatutNonAppliquer; i++) {
                     if(!protecteur.DonneesTraitement.StatutsAppliquer[occurenceMot[i]]) {
@@ -135,7 +137,7 @@ namespace fr.avh.braille.addin
             int safety = 0;
             do { // NP : continuer tant qu'on est sur un statut de mot ignoré
                 next = protecteur.ProchainMot();
-            } while(protecteur.SelectedOccurenceStatut == Statut.IGNORE
+            } while(protecteur.StatutOccurence == Statut.IGNORE
                     && safety < protecteur.DonneesTraitement.CarteMotOccurences.Count);
             RechargerFenetre();
             next.Select();
@@ -143,7 +145,7 @@ namespace fr.avh.braille.addin
 
         private void ProtegerIci_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(protecteur.SelectedWord))
+            if (!string.IsNullOrEmpty(protecteur.MotSelectionne))
             {
                 foreach (var mot in mots)
                 {
@@ -155,7 +157,7 @@ namespace fr.avh.braille.addin
 
         private void AbregerIci_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(protecteur.SelectedWord))
+            if (!string.IsNullOrEmpty(protecteur.MotSelectionne))
             {
                 foreach (var mot in mots)
                 {
@@ -177,7 +179,7 @@ namespace fr.avh.braille.addin
                 {
                     
                     if (
-                        protecteur.SelectedWord.ToLower()
+                        protecteur.MotSelectionne.ToLower()
                         == protecteur.DonneesTraitement.CarteMotOccurences.Keys.Last()
                     ) { // Si on est sur le dernier mot
                         if (!protecteur.EstTerminer()) { // S'il reste des éléments à traiter (pour lesquels un statut n'a pas été choisi)
@@ -277,9 +279,9 @@ namespace fr.avh.braille.addin
         /// </summary>
         private void AppliquerStatuts()
         {
-            string mot = protecteur.SelectedWord;
+            string mot = protecteur.MotSelectionne;
             List<int> occurences = protecteur.DonneesTraitement.CarteMotOccurences[
-                    protecteur.SelectedWord
+                    protecteur.MotSelectionne
                 ].Where(
                     i => protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.ABREGE 
                         || protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.PROTEGE
@@ -294,7 +296,7 @@ namespace fr.avh.braille.addin
 
             for(int i = 0; i < occurences.Count; i++) {
                 protecteur.SelectionnerOccurenceMot(mot, i).Select();
-                protecteur.AppliquerStatutSurOccurence(protecteur.SelectedOccurence, protecteur.SelectedOccurenceStatut);
+                protecteur.AppliquerStatutSurOccurence(protecteur.Occurence, protecteur.StatutOccurence);
 
                 Dispatcher.Invoke(() =>
                 {
@@ -315,7 +317,7 @@ namespace fr.avh.braille.addin
                 // NP : continuer tant qu'on est sur un statut de mot ignoré
                 previous = protecteur.PrecedentMot();
                 safety++;
-            } while(protecteur.SelectedOccurenceStatut == Statut.IGNORE 
+            } while(protecteur.StatutOccurence == Statut.IGNORE 
                     && safety < protecteur.DonneesTraitement.CarteMotOccurences.Count);
             RechargerFenetre();
             previous.Select();
@@ -370,17 +372,17 @@ namespace fr.avh.braille.addin
         private void RechargerFenetre()
         {
             protecteur.SelectedRange.Select();
-            Title = string.Format(dialogTitleTemplate, protecteur.SelectedWord);
-            Previous.IsEnabled = protecteur.SelectedOccurence > 0;
+            Title = string.Format(dialogTitleTemplate, protecteur.MotSelectionne);
+            Previous.IsEnabled = protecteur.Occurence > 0;
             
-            MotSelectionne.Content = string.Format(MotSelectionneTemplate, protecteur.SelectedWord);
+            MotSelectionne.Content = string.Format(MotSelectionneTemplate, protecteur.MotSelectionne);
             int motsUniquesTraites = protecteur.DonneesTraitement.CarteMotOccurences.Keys
                 .ToList()
-                .IndexOf(protecteur.SelectedWord);
+                .IndexOf(protecteur.MotSelectionne);
 
             MotsSelectionnable = protecteur.DonneesTraitement.CarteMotOccurences.Keys.OrderBy(k => k).ToList();
             SelecteurMot.ItemsSource = MotsSelectionnable;
-            _indexDuMotSelectionner = MotsSelectionnable.IndexOf(protecteur.SelectedWord);
+            _indexDuMotSelectionner = MotsSelectionnable.IndexOf(protecteur.MotSelectionne);
             SelecteurMot.SelectedIndex = _indexDuMotSelectionner;
 
             
@@ -398,7 +400,7 @@ namespace fr.avh.braille.addin
                     }
             ).ToList();
             MotDansOrdreDocument.ItemsSource = MotsSelectionnablesOrdonnes.Select((s, i) => $"{s} - {i+1}");
-            _indexDuMotSelectionnerDansLordre = MotsSelectionnablesOrdonnes.IndexOf(protecteur.SelectedWord);
+            _indexDuMotSelectionnerDansLordre = MotsSelectionnablesOrdonnes.IndexOf(protecteur.MotSelectionne);
             MotDansOrdreDocument.SelectedIndex = _indexDuMotSelectionnerDansLordre;
 
             Total.Content = string.Format(
@@ -407,14 +409,14 @@ namespace fr.avh.braille.addin
 
             NbOccurence.Content = string.Format(
                 NbOccurenceTemplate,
-                protecteur.DonneesTraitement.CarteMotOccurences[protecteur.SelectedWord].Count
+                protecteur.DonneesTraitement.CarteMotOccurences[protecteur.MotSelectionne].Count
             );
             RegleAbreviation.Content = string.Format(
                 RegleAbreviationTemplate,
-                Abreviation.RegleAppliquerSur(protecteur.SelectedWord) ?? "aucune"
+                Abreviation.RegleAppliquerSur(protecteur.MotSelectionne) ?? "aucune"
             );
             var listMot = protecteur.alreadyInDB
-                .Where(x => x.Texte == protecteur.SelectedWord.ToLower())
+                .Where(x => x.Texte == protecteur.MotSelectionne.ToLower())
                 .ToList();
             if (listMot.Count > 0)
             {
@@ -463,7 +465,7 @@ namespace fr.avh.braille.addin
                 protecteur.DonneesTraitement
                     .OccurencesAsListOfTuples()
                     .Where(
-                        m => m.Item2.ToLower().Trim() == protecteur.SelectedWord.ToLower().Trim()
+                        m => m.Item2.ToLower().Trim() == protecteur.MotSelectionne.ToLower().Trim()
                         && StatutsAfficher.Contains(m.Item3)
                     )
                     .Select(

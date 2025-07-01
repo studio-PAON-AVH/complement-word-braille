@@ -236,10 +236,13 @@
   -->
   <ItemGroup>
     <Compile Include="AddinUpdater.cs" />
-    <Compile Include="ControlePhrasesEtrangeres.xaml.cs">
-      <DependentUpon>ControlePhrasesEtrangeres.xaml</DependentUpon>
+    <Compile Include="ListeMotsHorsLexique.xaml.cs">
+      <DependentUpon>ListeMotsHorsLexique.xaml</DependentUpon>
     </Compile>
     <Compile Include="OptionsComplement.cs" />
+    <Compile Include="ProtectionInteractiveParOccurenceDialog.xaml.cs">
+      <DependentUpon>ProtectionInteractiveParOccurenceDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ProtectionWord.cs" />
     <Compile Include="FormulaireOptionsComplement.xaml.cs">
       <DependentUpon>FormulaireOptionsComplement.xaml</DependentUpon>
@@ -300,13 +303,17 @@
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <Page Include="ControlePhrasesEtrangeres.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="FormulaireOptionsComplement.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ListeMotsHorsLexique.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ProtectionInteractiveParOccurenceDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="TraitementBraille.xaml">
       <SubType>Designer</SubType>

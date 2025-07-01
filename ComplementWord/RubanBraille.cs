@@ -1,20 +1,16 @@
 ﻿
-using Microsoft.Office.Core;
 using Microsoft.Office.Interop.Word;
 using Microsoft.Office.Tools.Ribbon;
-using fr.avh.braille.addin;
 using System;
 using System.Windows;
-using Task = System.Threading.Tasks.Task;
 using fr.avh.braille.dictionnaire;
 using Word = Microsoft.Office.Interop.Word;
 using System.Windows.Threading;
 using System.Windows.Forms;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Linq;
-using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace fr.avh.braille.addin
 {
@@ -72,31 +68,26 @@ namespace fr.avh.braille.addin
         {
             _dispatcher.Invoke(() =>
             {
-                try {
-                    if (progressDialog == null) {
-                        progressDialog = new TraitementBraille(Path.GetFileNameWithoutExtension(Globals.ThisAddIn.Application.ActiveDocument.FullName));
-                    }
-                    progressDialog.Show();
-                    progressDialog.Focus();
-                    if (progessTuple != null) {
-                        progressDialog.Dispatcher.Invoke(() =>
-                        {
+                if (progressDialog == null || !progressDialog.IsLoaded) {
+                    progressDialog = new TraitementBraille(Path.GetFileNameWithoutExtension(Globals.ThisAddIn.Application.ActiveDocument.FullName));
+                }
+                progressDialog.Show();
+                progressDialog.Focus();
+                progressDialog.Dispatcher.Invoke(() =>
+                {
+                    try {
+                        if (progessTuple != null) {
                             progressDialog.SetProgress(progessTuple.Item1, progessTuple.Item2);
-                        });
-                    }
-
-                    progressDialog.Dispatcher.Invoke(() =>
-                    {
+                        }
                         if (message.Length > 0) {
                             progressDialog.AddMessage(message);
                             fr.avh.braille.dictionnaire.Globals.log(message);
                         }
-                    });
-                }
-                catch (Exception e) {
+                    }
+                    catch (Exception e) {
 
-                }
-                
+                    }
+                });
             });
             
         }
@@ -105,23 +96,29 @@ namespace fr.avh.braille.addin
         {
             _dispatcher.Invoke(() =>
             {
-                if (progressDialog == null) {
-                    progressDialog = new TraitementBraille();
-                    progressDialog.Show();
+                if (progressDialog == null || !progressDialog.IsLoaded) {
+                    progressDialog = new TraitementBraille(Path.GetFileNameWithoutExtension(Globals.ThisAddIn.Application.ActiveDocument.FullName));
                 }
+                progressDialog.Show();
+                progressDialog.Focus();
                 fr.avh.braille.dictionnaire.Globals.log(ex);
-                StringBuilder message = new StringBuilder($"L'erreur suivante a été remonté lors de l'analyse: \r\n" +
+                StringBuilder message = new StringBuilder($"L'erreur suivante a été remonté lors de l'action et doit être remonté à l'équipe de développement du complément : \r\n" +
                     $"{ex.Message}\r\n");
                 string stack = ex.StackTrace;
                 while (ex.InnerException != null) {
                     ex = ex.InnerException;
                     message.Append($"{ex.Message}\r\n");
                 }
-                message.Append($"{stack}");
+                message.Append($"{stack}\r\n");
                 progressDialog.Dispatcher.Invoke(() =>
                 {
-                    progressDialog.AddMessage(message.ToString());
-                    fr.avh.braille.dictionnaire.Globals.log(message.ToString());
+                    try {
+                        progressDialog.AddMessage(message.ToString());
+                        fr.avh.braille.dictionnaire.Globals.log(message.ToString());
+                    }
+                    catch (Exception e) {
+
+                    }
                 });
                 System.Windows.MessageBox.Show(
                     message.ToString(),
@@ -132,84 +129,28 @@ namespace fr.avh.braille.addin
             });
         }
 
-        private void AnalyserDocument_Click(object sender, RibbonControlEventArgs e)
-        {
-            _dispatcher = Dispatcher.CurrentDispatcher;
-            try {
-                if(progressDialog == null) {
-                    progressDialog = new TraitementBraille(Path.GetFileNameWithoutExtension(Globals.ThisAddIn.Application.ActiveDocument.FullName));
-                    progressDialog.Show();
-                } else {
-                    progressDialog.Focus();
-                }
-                // dispatcher requis pour rebind l'ui sur le thread principal
-                if (protectionTool == null) {
-                    analyzeDocument.Enabled = false;
-                    // TODO : Déléger l'analyse du document a la fenêtre TraitementBraille
-                    Globals.ThisAddIn.AnalyzeCurrentDocument(InfoCallbak,ErrorCallbak
-                    ).ContinueWith((t) =>
-                    {
-                        analyzeDocument.Enabled = true;
-                        if (t.Result == null) {
-                            return;
-                        } else {
-                            AfficherDictionnaire.Enabled = true;
-                            //AnalyseMotsEtranger.Enabled = true;
-                            protectionTool = t.Result;
-                            protectionTool.SelectionChanged += (index) =>
-                            {
-                                _dispatcher.Invoke(() =>
-                                {
-                                    MotSelectionner.Label = $"Mot : {protectionTool.SelectedWord}";
-                                    Progression.Label = $"Occurence : {protectionTool.SelectedWordOccurenceIndex + 1} / {protectionTool.SelectedWordOccurenceCount}";
-                                });
-                            };
-                            
-                            
-                            // Remplacer le info call back par l'ouverture de la fenêtre de journal avec le protection tool
-                            InfoCallbak("Lancement du passage en revue interactif pour le braille...");
-                            _dispatcher.Invoke(() =>
-                            {
-                                //System.Threading.Thread.Sleep(1000);
-                                progressDialog.BindToProtection(protectionTool);
-                                progressDialog.ShowDialog();
-                                //actions = new ProtectionInteractiveParMotsDialog(protectionTool);
-                                //// Empecher la modification du document pendant que la fenêtre est ouverte pour éviter de casser les positions
-                                //actions.ShowDialog();
-                            });
-                        }
-                    });
-                } else {
-                    Task.Run(() => {
-                        _dispatcher.Invoke(() =>
-                        {
-                            //System.Threading.Thread.Sleep(1000);
-                            //progressDialog.BindToProtection(protectionTool);
-                            progressDialog.ShowDialog();
-                            //actions = new ProtectionInteractiveParMotsDialog(protectionTool);
-                            //// Empecher la modification du document pendant que la fenêtre est ouverte pour éviter de casser les positions
-                            //actions.ShowDialog();
-                        });
-                        //protectionTool.ReanalyserDocumentSiModification();
-                        //InfoCallbak("Lancement du passage en revue interactif pour le braille...");
-                        //_dispatcher.Invoke(() =>
-                        //{
-                        //    MotSelectionner.Label = $"Mot : {protectionTool.SelectedWord}";
-                        //    Progression.Label = $"Occurence : {protectionTool.SelectedWordOccurenceIndex + 1} / {protectionTool.SelectedWordOccurenceCount}";
-                        //    System.Threading.Thread.Sleep(1000);
-                        //    actions = new ProtectionInteractiveParMotsDialog(protectionTool);
-                        //    // Empecher la modification du document pendant que la fenêtre est ouverte pour éviter de casser les positions
-                        //    actions.ShowDialog();
-                        //});
-                    });
-                    
-                }
-            } catch (Exception ex) {
-                System.Windows.MessageBox.Show(ex.Message);
-                return;
-            }
 
+        private async Task<ProtectionWord> GetProtectionToolAsync()
+        {
+            Dispatcher _d = Dispatcher.CurrentDispatcher;
+            if (Globals.ThisAddIn.documentProtection.ContainsKey(Globals.ThisAddIn.Application.ActiveDocument.FullName)) {
+                return Globals.ThisAddIn.documentProtection[Globals.ThisAddIn.Application.ActiveDocument.FullName];
+            } else {
+                return await Globals.ThisAddIn.AnalyzeCurrentDocument(InfoCallbak, ErrorCallbak).ContinueWith(t => { 
+                    ProtectionWord protection = t.Result;
+                    protection.SelectionChanged += (index) =>
+                    {
+                        _d.Invoke(() =>
+                        {
+                            MotSelectionner.Label = $"Mot : {protection.MotSelectionne}";
+                            Progression.Label = $"Occurence : {protection.SelectedWordOccurenceIndex + 1} / {protection.SelectedWordOccurenceCount}";
+                        });
+                    };
+                    return protection;
+                });
+             }
         }
+
 
         private void AfficherDictionnaire_Click(object sender, RibbonControlEventArgs e)
         {
@@ -271,41 +212,40 @@ namespace fr.avh.braille.addin
                     // si un dictionnaire de traitement est déja présent
                     ProtectionWord protector = Globals.ThisAddIn.documentProtection[Globals.ThisAddIn.Application.ActiveDocument.FullName];
                     protector.ReanalyserDocumentSiModification();
-                    if(selection.Words.Count > 0) {
-                        // Si la selection contient des espaces, on ne protège pas le mot mais le bloc de texte
+                    if(selection.Words.Count > 1) {
+                        // Si la selection contient plusieurs mots
                         protector.ProtegerBloc(selection);
-                        ProtectionWord.ProtegerBloc(Globals.ThisAddIn.Application.ActiveDocument, selection);
-                        return;
+                        //ProtectionWord.ProtegerBloc(Globals.ThisAddIn.Application.ActiveDocument, selection);
                     } else {
-
-                    }
+                        protector.Proteger(selection);
                         // proposer d'appliquer cette protection a toutes les occurences 
                         int selectedIndex = -1;
-                    if(System.Windows.MessageBox.Show(
-                        "Voulez-vous protéger toutes les occurences de ce mot ?", "Protection de mot", MessageBoxButton.YesNo
-                        ) == MessageBoxResult.No
-                    ) {
-                        // Compter le nombre d'occurence avant le mot sélectionné
-                        Range toBegin = Globals.ThisAddIn.Application.ActiveDocument.Range(
-                           Globals.ThisAddIn.Application.ActiveDocument.Content.Start,
-                           selection.Start
-                        );
-                        string text = toBegin.Text;
-                        string word = selection.Text.Trim();
-                        Regex search = ProtectionWord.SearchWord(word, RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        MatchCollection matches = search.Matches(text);
-                        selectedIndex = matches.Count;
-                    }
-                    // Ajouter le mot au traitement
-                    protector.AjouterMotAuTraitement(selection.Text.Trim().ToLower(),Statut.PROTEGE, selectedIndex);
-                    // resélectionner la premiere occurence du mot
-                    protector.SelectionnerOccurenceMot(selection.Text.Trim().ToLower(), selectedIndex >= 0 ? selectedIndex : 0);
-                    if (actions == null || !actions.IsLoaded) {
-                        actions = new ProtectionInteractiveParMotsDialog(protectionTool);
-                        actions.ShowDialog();
-                    } else {
-                        actions.Activate();
-                    }
+                        if (System.Windows.MessageBox.Show(
+                            "Voulez-vous protéger toutes les occurences de ce mot ?", "Protection de mot", MessageBoxButton.YesNo
+                            ) == MessageBoxResult.No
+                        ) {
+                            // Compter le nombre d'occurence avant le mot sélectionné
+                            Range toBegin = Globals.ThisAddIn.Application.ActiveDocument.Range(
+                               Globals.ThisAddIn.Application.ActiveDocument.Content.Start,
+                               selection.Start
+                            );
+                            string text = toBegin.Text;
+                            string word = selection.Text.Trim();
+                            Regex search = ProtectionWord.SearchWord(word, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                            MatchCollection matches = search.Matches(text);
+                            selectedIndex = matches.Count;
+                        }
+                        // Ajouter le mot au traitement
+                        protector.AjouterMotAuTraitement(selection.Text.Trim().ToLower(), Statut.PROTEGE, selectedIndex);
+                        // resélectionner la premiere occurence du mot
+                        protector.SelectionnerOccurenceMot(selection.Text.Trim().ToLower(), selectedIndex >= 0 ? selectedIndex : 0);
+                        if (actions == null || !actions.IsLoaded) {
+                            actions = new ProtectionInteractiveParMotsDialog(protectionTool);
+                            actions.ShowDialog();
+                        } else {
+                            actions.Activate();
+                        }
+                    }  
                 } else {
                     // Pas de dictionnaire de traitement, si la selection de mots est composé de plusieurs mots, protéger le texte entier avec ProtegerBloc
                     if(selection.Text.Split(' ').Length > 1)
@@ -383,39 +323,78 @@ namespace fr.avh.braille.addin
             options.ShowDialog();
         }
 
-        private void TestsButton_Click(object sender, RibbonControlEventArgs e)
+        private void ChargerDecisions_Click(object sender, RibbonControlEventArgs e)
         {
-            Document _document = Globals.ThisAddIn.Application.ActiveDocument;
-            string TexteEnMemoire = GetParsableTexte(_document);
-
-            Dictionary<int, Abreviation.OccurenceATraiter> motsATraiter = Abreviation.AnalyserTexte(TexteEnMemoire).Result;
-
-            List<Abreviation.OccurenceATraiter> motsHorsLexique =
-                motsATraiter
-                .Where((i) => (i.Value.EstAbregeable && !i.Value.EstFrançaisAbregeable))
-                .OrderBy((i) => i.Key)
-                .Select(i => i.Value)
-                .ToList();
-            List< Abreviation.OccurenceATraiter > motsAvecChiffres =
-                motsATraiter
-                .Where((i) => i.Value.ContientDesChiffres)
-                .OrderBy((i) => i.Key)
-                .Select(i => i.Value)
-                .ToList();
-            List<Abreviation.OccurenceATraiter> motsAvecMajusculesFrançaisOuAmbigu =
-                motsATraiter
-                .Where((i) => i.Value.EstAmbigu || (i.Value.EstAbregeable && i.Value.ContientDesMajuscules && i.Value.EstFrançaisAbregeable))
-                .OrderBy((i) => i.Key)
-                .Select(i => i.Value)
-                .ToList();
-
-            int t = 0;
-
+            Dispatcher _d = Dispatcher.CurrentDispatcher;
+            _d.Invoke(async () =>
+            {
+                try {
+                    InfoCallbak("Chargement d'un autre dictionnaire de décisions...");
+                    protectionTool = await GetProtectionToolAsync();
+                    protectionTool.ReanalyserDocumentSiModification();
+                    // Rechercher un fichier .bdic ou .json ou .ddic
+                    OpenFileDialog openFileDialog = new OpenFileDialog
+                    {
+                        Filter = "Fichiers de décisions (*.bdic, *.json, *.ddic)|*.bdic;*.json;*.ddic",
+                        DefaultExt = ".json",
+                        Title = "Sélectionner un fichier de décisions"
+                    };
+                    if (openFileDialog.ShowDialog() == DialogResult.OK) {
+                        string filePath = openFileDialog.FileName;
+                        protectionTool.ImporterUnDictionnaire(filePath);
+                        InfoCallbak(filePath + " chargé avec succès, vous pouvez commencez le traitement par mots");
+                    }
+                } catch (Exception ex) {
+                    ErrorCallbak(ex);
+                    return;
+                }
+                
+            });
         }
 
-        private string GetParsableTexte(Document d)
+        private void LancerTraitementMots_Click(object sender, RibbonControlEventArgs e)
         {
-            return d.StoryRanges[WdStoryType.wdMainTextStory].Text.Replace("\a", "");
+            Dispatcher _d = Dispatcher.CurrentDispatcher;
+            _d.Invoke(async () => {
+                try {
+                    InfoCallbak("Lancement du traitement par mots ...");
+                    protectionTool = await GetProtectionToolAsync();
+                    protectionTool.ReanalyserDocumentSiModification();
+                    new ProtectionInteractiveParMotsDialog(protectionTool).ShowDialog();
+                } catch (AggregateException ex) {
+                    ErrorCallbak(ex);
+                    return;
+                }
+                
+            });
+        }
+
+        private ListeMotsHorsLexique _listeMotsHorsLexique = null;
+
+
+
+        private void MotsHorsLexique_Click(object sender, RibbonControlEventArgs e)
+        {
+            Dispatcher _d = Dispatcher.CurrentDispatcher;
+            _d.Invoke(async () =>
+            {
+                try {
+                    InfoCallbak("Récupération des mots hors lexique ...");
+                    protectionTool = await GetProtectionToolAsync();
+                    protectionTool.ReanalyserDocumentSiModification();
+                    if (_listeMotsHorsLexique != null && _listeMotsHorsLexique.IsLoaded) {
+                        _listeMotsHorsLexique.Activate();
+                        return;
+                    }
+                    _listeMotsHorsLexique = new ListeMotsHorsLexique(protectionTool);
+                    _listeMotsHorsLexique.Show();
+                }
+                catch (AggregateException ex) {
+                    ErrorCallbak(ex);
+                    return;
+                }
+            });
+            
         }
     }
 }

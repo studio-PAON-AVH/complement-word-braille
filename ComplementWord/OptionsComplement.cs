@@ -26,16 +26,21 @@ namespace fr.avh.braille.addin
                 config.Load(CONFIG);
                 XmlNode preprotec = config.GetElementsByTagName("preprotectionauto").Item(0);
                 if (preprotec != null) {
-                    ActiverPreProtectionAuto = bool.Parse(preprotec.InnerText);
+                    try {
+                        ActiverPreProtectionAuto = bool.Parse(preprotec.InnerText);
+                    }
+                    catch (Exception e) {
+                    }
                 }
-                try {
-                    XmlNode lastUpdateCheck = config.GetElementsByTagName("lastupdatecheck").Item(0);
-                    if (lastUpdateCheck != null) {
+                XmlNode lastUpdateCheck = config.GetElementsByTagName("lastupdatecheck").Item(0);
+                if (lastUpdateCheck != null) {
+                    try {
                         LastUpdateCheck = DateTime.Parse(preprotec.InnerText);
                     }
-                } catch (Exception e) {
-                    //ActiverPreProtectionAuto = false;
+                    catch (Exception e) {
+                    }
                 }
+               
                 
             }
         }
@@ -53,6 +58,8 @@ namespace fr.avh.braille.addin
             XmlElement lastUpdateCheck = config.CreateElement("lastupdatecheck");
             lastUpdateCheck.InnerText = lastUpdateCheck.ToString();
             root.AppendChild(lastUpdateCheck);
+
+
 
             config.Save(CONFIG);
         }

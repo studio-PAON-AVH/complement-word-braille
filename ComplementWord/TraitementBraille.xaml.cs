@@ -45,13 +45,15 @@ namespace fr.avh.braille.addin
         {
             _protectionWord = protection;
             if (_protectionWord != null) {
-                LancerAnalysePhrases.IsEnabled = true;
-                LancerParcourMots.IsEnabled = true;
-                LancerChargementDictionnaire.IsEnabled = true;
+                //LancerAnalysePhrases.IsEnabled = true;
+                //LancerParcourMots.IsEnabled = true;
+                //LancerChargementDictionnaire.IsEnabled = true;
+                //LancerParcourLecture.IsEnabled = true;
             } else {
-                LancerAnalysePhrases.IsEnabled = false;
-                LancerParcourMots.IsEnabled = false;
-                LancerChargementDictionnaire.IsEnabled = false;
+                //LancerAnalysePhrases.IsEnabled = false;
+                //LancerParcourMots.IsEnabled = false;
+                //LancerChargementDictionnaire.IsEnabled = false;
+                //LancerParcourLecture.IsEnabled = false;
             }
 
         }
@@ -117,16 +119,41 @@ namespace fr.avh.braille.addin
         {
             Dispatcher.Invoke(() =>
             {
-                LancerAnalysePhrases.IsEnabled = false;
-                LancerParcourMots.IsEnabled = false;
-                LancerChargementDictionnaire.IsEnabled = false;
-                _protectionWord.ReanalyserDocumentSiModification();
-                LancerAnalysePhrases.IsEnabled = true;
-                LancerParcourMots.IsEnabled = true;
-                LancerChargementDictionnaire.IsEnabled = true;
-                // Empecher la modification du document pendant que la fenêtre est ouverte pour éviter de casser les positions
-                new ProtectionInteractiveParMotsDialog(_protectionWord).ShowDialog();
+                //LancerAnalysePhrases.IsEnabled = false;
+                //LancerParcourMots.IsEnabled = false;
+                //LancerChargementDictionnaire.IsEnabled = false;
+                //LancerParcourLecture.IsEnabled = false;
+                //_protectionWord.ReanalyserDocumentSiModification();
+                //LancerAnalysePhrases.IsEnabled = true;
+                //LancerParcourMots.IsEnabled = true;
+                //LancerParcourLecture.IsEnabled = true;
+                //LancerChargementDictionnaire.IsEnabled = true;
+                //// Empecher la modification du document pendant que la fenêtre est ouverte pour éviter de casser les positions
+                
+                //new ProtectionInteractiveParMotsDialog(_protectionWord).ShowDialog();
             });
+        }
+
+        private void LancerParcourLecture_Click(object sender, RoutedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                //LancerAnalysePhrases.IsEnabled = false;
+                //LancerParcourMots.IsEnabled = false;
+                //LancerChargementDictionnaire.IsEnabled = false;
+                //LancerParcourLecture.IsEnabled = false;
+                //// TODO : faire faire ça par l'autre fenetre de dialogue
+                //_protectionWord.ReanalyserDocumentSiModification();
+                //LancerAnalysePhrases.IsEnabled = true;
+                //LancerParcourMots.IsEnabled = true;
+
+                //LancerParcourLecture.IsEnabled = true;
+                //LancerChargementDictionnaire.IsEnabled = true;
+                //// Empecher la modification du document pendant que la fenêtre est ouverte pour éviter de casser les positions
+                //var test = new ProtectionInteractiveParOccurenceDialog(_protectionWord).ShowDialog();
+                
+            });
+            
         }
     }
 }
