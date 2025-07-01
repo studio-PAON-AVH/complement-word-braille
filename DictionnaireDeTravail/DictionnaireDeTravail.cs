@@ -444,6 +444,8 @@ namespace fr.avh.braille.dictionnaire
 
         public void RechargerDecisionDe(DictionnaireDeTravail importer)
         {
+            
+
             switch (importer.Format) {
                 case FORMAT.DDIC:
                     // Contient uniquement une cartographie des mots et statuts
@@ -555,35 +557,63 @@ namespace fr.avh.braille.dictionnaire
         }
 
 
-
-        public void AppliquerStatut(int occurence, Statut statut)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="occurence"></param>
+        /// <param name="statut"></param>
+        /// <param name="decalageAvant"></param>
+        /// <param name="decalageApres"></param>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        public void AppliquerStatut(int occurence, Statut statut, int decalageAvant = int.MinValue, int decalageApres = int.MinValue)
         {
             if (occurence < 0 || occurence >= StatutsOccurences.Count) {
                 throw new ArgumentOutOfRangeException(nameof(occurence), "L'index d'occurence est hors des limites de la liste.");
             }
             var previous = StatutsAppliquer[occurence] ? StatutsOccurences[occurence] : Statut.INCONNU;
             StatutsOccurences[occurence] = statut;
-            
-            StatutsAppliquer[occurence] = statut != Statut.INCONNU;
-            int change = 
-                previous == Statut.PROTEGE && statut != Statut.PROTEGE // Suppresion de protection = -1
-                ? -1 :
-                statut == Statut.PROTEGE && previous != Statut.PROTEGE // Ajout de protection = +1
-                ? 1 : 
-                0; // No change
-
-            // On applique le changement de position a l'occurence en cours et aux suivantes
-            for (int i = occurence; i < PositionsOccurences.Count; i++) {
-                // -7, +7 ou 0 s'il y a abreviation, protection ou pas de changement
-                PositionsOccurences[i] += (change * PROTECTION_CODE.Length); 
-            }
-            for (int i = 0; i < DebutsBlocsIntegral.Count; i++) {
-                if (DebutsBlocsIntegral[i] > PositionsOccurences[occurence]) {
-                    // Si le debut du bloc est après l'occurence, on décale le bloc
-                    DebutsBlocsIntegral[i] += (change * PROTECTION_CODE.Length);
-                    FinsBlocsIntegral[i] += (change * PROTECTION_CODE.Length);
+            if (decalageAvant != int.MinValue) {
+                StatutsAppliquer[occurence] = statut != Statut.INCONNU;
+                // Si un offset est spécifié, on l'applique à la position de l'occurence
+                PositionsOccurences[occurence] += decalageAvant;
+                int decalageOccurencesSuivantes = decalageAvant + (decalageApres != int.MinValue ? decalageApres : 0);
+                // On décalle les occurences suivantes
+                for (int i = occurence + 1; i < PositionsOccurences.Count; i++) {
+                    PositionsOccurences[i] += decalageOccurencesSuivantes;
                 }
-            }
+                // Et les blocs en intéral
+                for (int i = 0; i < DebutsBlocsIntegral.Count; i++) {
+                    if (DebutsBlocsIntegral[i] > PositionsOccurences[occurence]) {
+                        // Si le debut du bloc est après l'occurence, on décale le bloc
+                        DebutsBlocsIntegral[i] += decalageOccurencesSuivantes;
+                        FinsBlocsIntegral[i] += decalageOccurencesSuivantes;
+                    }
+                }
+            } 
+            //else {
+            //    StatutsAppliquer[occurence] = statut != Statut.INCONNU;
+            //    int change =
+            //        previous == Statut.PROTEGE && statut != Statut.PROTEGE // Suppresion de protection = -1
+            //        ? -1 :
+            //        statut == Statut.PROTEGE && previous != Statut.PROTEGE // Ajout de protection = +1
+            //        ? 1 :
+            //        0; // No change
+            //    if(change != 0) {
+            //        // On applique le changement de position a l'occurence en cours et aux suivantes
+            //        for (int i = occurence; i < PositionsOccurences.Count; i++) {
+            //            // -7, +7 ou 0 s'il y a abreviation, protection ou pas de changement
+            //            PositionsOccurences[i] += (change * PROTECTION_CODE.Length);
+            //        }
+            //        for (int i = 0; i < DebutsBlocsIntegral.Count; i++) {
+            //            if (DebutsBlocsIntegral[i] > PositionsOccurences[occurence]) {
+            //                // Si le debut du bloc est après l'occurence, on décale le bloc
+            //                DebutsBlocsIntegral[i] += (change * PROTECTION_CODE.Length);
+            //                FinsBlocsIntegral[i] += (change * PROTECTION_CODE.Length);
+            //            }
+            //        }
+            //    }
+            //}
+                
         }
 
         /// <summary>
@@ -613,11 +643,11 @@ namespace fr.avh.braille.dictionnaire
             return Statut.IGNORE;
         }
 
-        public void AppliquerStatut(string mot, Statut statut)
+        public void AppliquerStatut(string mot, Statut statut, int offsetBefore = int.MinValue, int offsetAfter = int.MinValue)
         {
             if (CarteMotOccurences.ContainsKey(mot.ToLower().Trim())) {
                 foreach (int index in CarteMotOccurences[mot.ToLower().Trim()]) {
-                    AppliquerStatut(index, statut);
+                    AppliquerStatut(index, statut, offsetBefore, offsetAfter);
                 }
             }
             CarteMotStatut[mot.ToLower().Trim()] = statut;
