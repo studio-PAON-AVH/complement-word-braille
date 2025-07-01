@@ -2568,7 +2568,7 @@ namespace fr.avh.braille.dictionnaire
         /// Expression de recherche de mots (contenant au moins une majuscule ou une minuscule) hors code duxburry
         /// </summary>
         private static readonly Regex WORDS = new Regex(
-                $"(?<=[^{ALPHANUM}-]|^)(\\[\\[\\*i\\*\\]\\])?(?<!{REG_CS})([{ALPHANUM}_-]*[{MIN}{MAJ}][{ALPHANUM}_-]*)(?=[^{ALPHANUM}'’-@]|$)",
+                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE})?(?<!{REG_CS})([{ALPHANUM}_-]*[{MIN}{MAJ}][{ALPHANUM}_-]*)(?=[^{ALPHANUM}'’-]|$)",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline
             );
 
@@ -2597,10 +2597,10 @@ namespace fr.avh.braille.dictionnaire
 
         }
 
-
         public static async Task<Dictionary<int,OccurenceATraiter>> AnalyserTexte(string texteAAnalyser, Utils.OnInfoCallback info = null)
         {
             Dictionary<int,OccurenceATraiter> motsAnalyses = new Dictionary<int,OccurenceATraiter>();
+            
             MatchCollection result = WORDS.Matches(texteAAnalyser);
             if (result.Count > 0) {
                 info?.Invoke($"Analyse des mots {result.Count} mots du document", new Tuple<int, int>(0, result.Count));
