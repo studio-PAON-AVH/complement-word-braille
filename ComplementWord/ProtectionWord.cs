@@ -175,8 +175,14 @@ namespace fr.avh.braille.addin
             object notReadOnly = false;
             string filename = document.FullName;
             string dicName = Path.GetFileNameWithoutExtension(filename) + ".json";
-            
+            WorkingDictionnaryPath = Path.Combine(fr.avh.braille.dictionnaire.Globals.AppData.FullName, dicName);
+            try {
+                if (Directory.Exists(Path.GetDirectoryName(filename))) {
             WorkingDictionnaryPath = Path.Combine(Path.GetDirectoryName(filename), dicName);
+                }
+            } catch(Exception e) {
+               // Stocker le dictionnaire dans le dossier AppData
+            }
 
             if (document != null)
             {
