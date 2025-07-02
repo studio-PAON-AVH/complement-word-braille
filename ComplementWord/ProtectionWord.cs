@@ -1479,24 +1479,38 @@ namespace fr.avh.braille.addin
                 wordRange = _document.Range(wordRange.Start, wordRange.End - +DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
             }
 
-            int indexDebut = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.Start && wordRange.Start <= t.Item2);
-            int indexFin = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.End && wordRange.End <= t.Item2);
+            int debutProtection = wordRange.Start;
+            int finProtection = wordRange.End;
 
-            if(indexDebut < 0 && indexFin < 0) {
-                // Si le bloc n'est pas dans la liste des blocs intégral, on protège la zone
-                 // passer en ignorer toutes les occurences situés dans l'intervale
-                wordRange = ProtegerBloc(_document, wordRange);
-                DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
-                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
-                    if (DonneesTraitement.PositionsOccurences[i] >= wordRange.Start && DonneesTraitement.PositionsOccurences[i] <= wordRange.End) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+            int indexDebut = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= debutProtection && debutProtection <= t.Item2);
+            int indexFin = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= finProtection && finProtection <= t.Item2);
+
+            if (indexDebut < 0 && indexFin < 0) {
+
+                // Supprimer tous les blocs intégrale entre wordRange.Start et wordRange.End
+                for (int i = DonneesTraitement.ListeBlocsIntegral.Count - 1; i >= 0; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    if (bloc.Item1 >= debutProtection && bloc.Item2 <= finProtection) {
+                        AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                        DonneesTraitement.SupprimerBlocIntegral(i, true);
+                        // Décaller la fin attendu du nouveau bloc abrégé
+                        finProtection -= (DictionnaireDeTravail.PROTECTION_CODE_G1.Length + DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
                     }
                 }
-                
+
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= debutProtection && DonneesTraitement.PositionsOccurences[i] < finProtection) {
+                        AppliquerStatutSurOccurence(i, Statut.IGNORE);
+                    }
+                }
+
+                // Si le bloc n'est pas dans la liste des blocs intégral, on protège la zone
+                // passer en ignorer toutes les occurences situés dans l'intervale
+                wordRange = ProtegerBloc(_document, wordRange);
+                DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
                 return;
             } else if(indexDebut == indexFin) {
-                    // Deja protégé, on ne fait rien
+                    // Deja dans un bloc protégé
                 return;
             } else if(indexDebut >= 0 && indexDebut < indexFin) {
                 // protection sur plusieurs bloc : fusion des blocs
@@ -1510,13 +1524,12 @@ namespace fr.avh.braille.addin
                     DonneesTraitement.SupprimerBlocIntegral(i);
                 }
                 // Creer le nouveau block
-                ProtegerBloc(_document, _document.Range(blocStart, newEnd));
-                DonneesTraitement.AjouterBlocIntegral(blocStart, newEnd, true);
+                wordRange = ProtegerBloc(_document, _document.Range(blocStart, newEnd));
+                DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
                 //Passer en ignorer toutes les occurence dans le nouveau block
-                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                for (int i = DonneesTraitement.Occurences.Count - 1; i >=0 ; i--) {
                     if (DonneesTraitement.PositionsOccurences[i] >= blocStart && DonneesTraitement.PositionsOccurences[i] <= newEnd) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+                        AppliquerStatutSurOccurence(i, Statut.IGNORE);
                     }
                 }
 
@@ -1537,10 +1550,9 @@ namespace fr.avh.braille.addin
                 wordRange = ProtegerBloc(_document, _document.Range(blocStart, newEnd));
                 DonneesTraitement.AjouterBlocIntegral(blocStart, newEnd, true);
                 // Passer en ignorer toutes les occurence dans le nouveau block
-                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                for (int i = DonneesTraitement.Occurences.Count - 1; i >= 0; i--) {
                     if (DonneesTraitement.PositionsOccurences[i] >= wordRange.Start && DonneesTraitement.PositionsOccurences[i] <= wordRange.End) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+                        AppliquerStatutSurOccurence(i, Statut.IGNORE);
                     }
                 }
 
@@ -1562,10 +1574,9 @@ namespace fr.avh.braille.addin
                 ProtegerBloc(_document, _document.Range(newStart, blockEnd));
                 DonneesTraitement.AjouterBlocIntegral(newStart, blockEnd, true);
                 //Passer en ignorer toutes les occurence dans le nouveau block
-                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                for (int i = DonneesTraitement.Occurences.Count - 1; i >= 0; i--) {
                     if (DonneesTraitement.PositionsOccurences[i] >= newStart && DonneesTraitement.PositionsOccurences[i] <= blockEnd) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+                        AppliquerStatutSurOccurence(i, Statut.IGNORE);
                     }
                 }
             }
@@ -1916,169 +1927,187 @@ namespace fr.avh.braille.addin
             if (wordRange.Text.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)){
                 wordRange = _document.Range(wordRange.Start, wordRange.End - +DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
             }
+
             wordRange.Select();
-            int indexDebut = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.Start && wordRange.Start <= t.Item2);
-            int indexFin = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.End && wordRange.End <= t.Item2);
 
+            int debutAbreger = wordRange.Start;
+            int finAbreger = wordRange.End;
+            int longueurTexte = debutAbreger - finAbreger;
+            int indexDebut = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= debutAbreger && debutAbreger <= t.Item2);
+            int indexFin = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= finAbreger && finAbreger <= t.Item2);
+            // Texte sans plus aucun code de protection
+            int LongueurTextAbreger = wordRange.Text
+                .Replace(DictionnaireDeTravail.PROTECTION_CODE_G1, "")
+                .Replace(DictionnaireDeTravail.PROTECTION_CODE_G2, "")
+                .Replace(DictionnaireDeTravail.PROTECTION_CODE, "")
+                .Length;
             if (indexDebut < 0 && indexFin < 0) {
-                // Rien a faire, deja abreger
-                return;
-            } else if (indexDebut == indexFin) {
-
-                // TODO : séprarer le bloc intégral en 3 partie (integral abrege integrale
-                int block1Start = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
-                int block2End = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
-                int block2Length = block2End - wordRange.End;
-                int block1Length = wordRange.Start - block1Start;
-
-                string testText = _document.Range(block1Start, block2End).Text;
-
-                // Supprimer le bloc courant et renvoie la position du bloc "abrege"
-                wordRange = AbregerBloc(_document, _document.Range(block1Start, block2End));
-                block1Start = wordRange.Start;
-                block2End = wordRange.End;
-                DonneesTraitement.SupprimerBlocIntegral(indexDebut, true);
-
-                // traitement Bloc abreger : 
-                int start = block1Start + block1Length;
-                int length = block2End - block2Length - start;
-                //Passage en abrege des occurences (et remise a jour des positions
-                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
-                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+                // Supprimer tous les blocs intégrale entre wordRange.Start et wordRange.End
+                for (int i = DonneesTraitement.ListeBlocsIntegral.Count - 1; i >= 0; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    if (bloc.Item1 >= debutAbreger && bloc.Item2 <= finAbreger) {
+                        AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                        DonneesTraitement.SupprimerBlocIntegral(i, true);
+                        // Décaller la fin attendu du nouveau bloc abrégé
+                        finAbreger -= (DictionnaireDeTravail.PROTECTION_CODE_G1.Length + DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
                     }
                 }
 
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= debutAbreger && DonneesTraitement.PositionsOccurences[i] < finAbreger) {
+                        AppliquerStatutSurOccurence(i, Statut.ABREGE);
+                    }
+                }
+
+            } else if (indexDebut == indexFin) {
+                // séprarer le bloc intégral en 3 partie (integral puis abrege puis integrale
+                int debutProtegerAvant = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int finProtegerApres = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
+                int tailleProtegerApres = finProtegerApres - finAbreger;
+                int tailleProtegerAvant = debutAbreger - debutProtegerAvant;
+
+                // Supprimer le bloc courant et renvoie la position du bloc "abrege"
+                wordRange = AbregerBloc(_document, _document.Range(debutProtegerAvant, finProtegerApres));
+                debutProtegerAvant = wordRange.Start;
+                debutAbreger = debutProtegerAvant + tailleProtegerAvant;
+                finProtegerApres = wordRange.End;
+                finAbreger = finProtegerApres - tailleProtegerApres;
+                DonneesTraitement.SupprimerBlocIntegral(indexDebut, true);
+                // Abreger les mots entre les 2 blocs
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= debutAbreger && DonneesTraitement.PositionsOccurences[i] < finAbreger) {
+                        AppliquerStatutSurOccurence(i, Statut.ABREGE);
+                    }
+                }
+                finAbreger = debutAbreger + LongueurTextAbreger;
+
+
                 // Reajouter un sous block 1 avant s'il y avait d'autres mots
-                if (block1Length > 0) {
-                    wordRange = ProtegerBloc(_document, _document.Range(block1Start, block1Start + block1Length));
+                if (tailleProtegerAvant > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(debutProtegerAvant, debutProtegerAvant + tailleProtegerAvant));
                     DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
-                    start = wordRange.End;
+                    debutAbreger = wordRange.End;
+                    finAbreger = debutAbreger + LongueurTextAbreger;
                 }
                 // Reajouter un bloc a la fin s'il y avait d'autres mots
-                if (block2Length > 0) {
-                    wordRange = ProtegerBloc(_document, _document.Range(block2End - block2Length, block2End));
-                    DonneesTraitement.AjouterBlocIntegral(block2End - block2Length, block2End, true);
+                if (tailleProtegerApres > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(finAbreger, finAbreger + tailleProtegerApres));
+                    DonneesTraitement.AjouterBlocIntegral(finAbreger, finAbreger + tailleProtegerApres, true);
                 }
                 
 
             } else if (indexDebut >= 0 && indexDebut < indexFin) {
-                // supprimer les bloc intermédiaire et remplacer les blocks de début et de fin
-                int block1Start = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
-                int block1End = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
-                int block2Start = DonneesTraitement.ListeBlocsIntegral[indexFin].Item1;
-                int block2End = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
-               
-                int textAbregerAttendu = wordRange.Text.Replace(DictionnaireDeTravail.PROTECTION_CODE_G1,"").Replace(DictionnaireDeTravail.PROTECTION_CODE_G2, "").Length;
-
-                int block2Length = block2End - wordRange.End;
-                int block1Length = wordRange.Start - block1Start;
+                // séprarer le bloc intégral en 3 partie (integral puis abrege puis integrale
+                int debutProtegerAvant = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int finProtegerApres = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
+                int tailleProtegerApres = finProtegerApres - finAbreger;
+                int tailleProtegerAvant = debutAbreger - debutProtegerAvant;
 
                 // Supprimer tous les blocs dans la plage [indexDebut, indexFin]
                 for (int i = indexFin; i >= indexDebut; i--) {
                     var bloc = DonneesTraitement.ListeBlocsIntegral[i];
                     wordRange = AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
-                    DonneesTraitement.SupprimerBlocIntegral(i);
+                    DonneesTraitement.SupprimerBlocIntegral(i, true);
+                    finAbreger -= (DictionnaireDeTravail.PROTECTION_CODE_G1.Length + DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
                 }
-                block1Start = wordRange.Start;
-                
-                // Bloc abreger : 
-                int start = block1Start + block1Length;
-                int length = textAbregerAttendu;
+                debutProtegerAvant = wordRange.Start;
+                debutAbreger = debutProtegerAvant + tailleProtegerAvant;
                 //Passage en abrege des occurences (et remise a jour des positions
                 for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
-                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    if (DonneesTraitement.PositionsOccurences[i] >= debutAbreger && DonneesTraitement.PositionsOccurences[i] < finAbreger) {
+                        AppliquerStatutSurOccurence(i, Statut.ABREGE);
                     }
                 }
-
-                block2Start = start + length;
-                if (block1Length > 0) {
-                    wordRange = ProtegerBloc(_document, _document.Range(block1Start, block1Start + block1Length));
+                finAbreger = debutAbreger + LongueurTextAbreger;
+                // Reajouter un sous block 1 avant s'il y avait d'autres mots
+                if (tailleProtegerAvant > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(debutProtegerAvant, debutProtegerAvant + tailleProtegerAvant));
                     DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
-                    start = wordRange.End;
-                    block2Start = start + length;
+                    debutAbreger = wordRange.End;
+                    finAbreger = debutAbreger + LongueurTextAbreger;
                 }
                 // Reajouter un bloc a la fin s'il y avait d'autres mots
-                if (block2Length > 0) {
-                    wordRange = ProtegerBloc(_document, _document.Range(block2Start, block2Start + block2Length));
-                    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                if (tailleProtegerApres > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(finAbreger, finAbreger + tailleProtegerApres));
+                    DonneesTraitement.AjouterBlocIntegral(finAbreger, finAbreger + tailleProtegerApres, true);
                 }
-               
-
             } else if (indexDebut >= 0 && indexFin < 0) {
-                // réduction d'un bloc existant vers son début
-                int block1Start = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
-                int block1End = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
-                int block1Length = wordRange.Start - block1Start;
-                int endAbreger = wordRange.End;
+                // séprarer le bloc intégral en 3 partie (integral puis abrege puis integrale
+                int debutProtegerAvant = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int finProtegerApres = finAbreger;
+                //int tailleProtegerApres = finProtegerApres - finAbreger;
+                int tailleProtegerAvant = debutAbreger - debutProtegerAvant;
 
-                int textAbregerAttendu = wordRange.Text.Replace(DictionnaireDeTravail.PROTECTION_CODE_G1, "").Replace(DictionnaireDeTravail.PROTECTION_CODE_G2, "").Length;
-                
-                // Supprimer les bloc dans la plage
+                // Supprimer tous les blocs dans la plage [indexDebut, total] mais situé avant finAbreger
                 for (int i = DonneesTraitement.ListeBlocsIntegral.Count - 1; i >= indexDebut; i--) {
                     var bloc = DonneesTraitement.ListeBlocsIntegral[i];
-                    if (bloc.Item1 >= block1Start && bloc.Item2 <= endAbreger) {
-                        // On trouve un bloc qui commence après le début du bloc actuel et avant la fin du nouveau bloc
+                    if (debutAbreger <= bloc.Item1 && bloc.Item2 <= finAbreger) {
                         wordRange = AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
-                        DonneesTraitement.SupprimerBlocIntegral(i);
-                    }
+                        DonneesTraitement.SupprimerBlocIntegral(i, true);
+                        finAbreger -= (DictionnaireDeTravail.PROTECTION_CODE_G1.Length + DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
+                    }       
                 }
-
-                block1Start = wordRange.Start;
-                // Bloc abreger : 
-                int start = block1Start + block1Length;
-                int length = textAbregerAttendu;
+                debutProtegerAvant = wordRange.Start;
+                debutAbreger = debutProtegerAvant + tailleProtegerAvant;
                 //Passage en abrege des occurences (et remise a jour des positions
                 for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
-                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    if (DonneesTraitement.PositionsOccurences[i] >= debutAbreger && DonneesTraitement.PositionsOccurences[i] < finAbreger) {
+                        AppliquerStatutSurOccurence(i, Statut.ABREGE);
                     }
                 }
-
-                // S'il restait des mots avant le nouveau bloc, on reprotège partiellement le dernier bloc abrègé
-                if (block1Length > 0) {
-                    wordRange = ProtegerBloc(_document, _document.Range(block1Start, block1Start + block1Length));
+                finAbreger = debutAbreger + LongueurTextAbreger;
+                // Reajouter un sous block 1 avant s'il y avait d'autres mots
+                if (tailleProtegerAvant > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(debutProtegerAvant, debutProtegerAvant + tailleProtegerAvant));
                     DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
-                    start = wordRange.End;
+                    debutAbreger = wordRange.End;
+                    finAbreger = debutAbreger + LongueurTextAbreger;
                 }
+                // Reajouter un bloc a la fin s'il y avait d'autres mots
+                //if (tailleProtegerApres > 0) {
+                //    wordRange = ProtegerBloc(_document, _document.Range(finAbreger, finAbreger + tailleProtegerApres));
+                //    DonneesTraitement.AjouterBlocIntegral(finAbreger, finAbreger + tailleProtegerApres, true);
+                //}
 
             } else if (indexDebut < 0 && indexFin >= 0) {
 
-                // réduction d'un bloc existant vers son début
-                int block2Start = DonneesTraitement.ListeBlocsIntegral[indexFin].Item1;
-                int block2End = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
-                int block2Length = block2End - wordRange.End;
+                // séprarer le bloc intégral en 3 partie (integral puis abrege puis integrale
+                int debutProtegerAvant = debutAbreger;
+                int finProtegerApres = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
+                int tailleProtegerApres = finProtegerApres - finAbreger;
+                //int tailleProtegerAvant = debutAbreger - debutProtegerAvant;
 
-                int start = wordRange.Start;
-                int textAbregerAttendu = wordRange.Text.Replace(DictionnaireDeTravail.PROTECTION_CODE_G1, "").Replace(DictionnaireDeTravail.PROTECTION_CODE_G2, "").Length;
-                int length = textAbregerAttendu;
-               
-                // Supprimer les bloc entre le bloc de fin et le début qui sont dans la sélection
+                // Supprimer tous les blocs dans la plage [indexDebut, total] mais situé avant finAbreger
                 for (int i = indexFin; i >= 0; i--) {
                     var bloc = DonneesTraitement.ListeBlocsIntegral[i];
-                    if (bloc.Item1 >= start && bloc.Item2 <= block2End) {
-                        // On trouve un bloc qui commence après le début du bloc actuel et avant la fin du nouveau bloc
+                    if (debutAbreger <= bloc.Item1 && bloc.Item2 <= finAbreger) {
                         wordRange = AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
-                        DonneesTraitement.SupprimerBlocIntegral(i);
+                        DonneesTraitement.SupprimerBlocIntegral(i, true);
+                        finAbreger -= (DictionnaireDeTravail.PROTECTION_CODE_G1.Length + DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
                     }
                 }
+                //debutProtegerAvant = wordRange.Start;
+                debutAbreger = debutProtegerAvant;
                 //Passage en abrege des occurences (et remise a jour des positions
                 for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
-                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
-                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
-                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    if (DonneesTraitement.PositionsOccurences[i] >= debutAbreger && DonneesTraitement.PositionsOccurences[i] < finAbreger) {
+                        AppliquerStatutSurOccurence(i, Statut.ABREGE);
                     }
                 }
-                block2Start = start + length;
+                finAbreger = debutAbreger + LongueurTextAbreger;
+                // Reajouter un sous block 1 avant s'il y avait d'autres mots
+                //if (tailleProtegerAvant > 0) {
+                //    wordRange = ProtegerBloc(_document, _document.Range(debutProtegerAvant, debutProtegerAvant + tailleProtegerAvant));
+                //    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                //    debutAbreger = wordRange.End;
+                //    finAbreger = debutAbreger + LongueurTextAbreger;
+                //}
                 // Reajouter un bloc a la fin s'il y avait d'autres mots
-                if (block2Length > 0) {
-                    wordRange = ProtegerBloc(_document, _document.Range(block2Start, block2Start + block2Length));
-                    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                if (tailleProtegerApres > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(finAbreger, finAbreger + tailleProtegerApres));
+                    DonneesTraitement.AjouterBlocIntegral(finAbreger, finAbreger + tailleProtegerApres, true);
                 }
+
             }
             ChargerTexteEnMemoire();
         }
@@ -2551,13 +2580,13 @@ namespace fr.avh.braille.addin
             bool estProtegerMot = EstProtegerMot(_document, current);
             int offsetCurrent = 0;
             int offsetNext = 0;
-            // On ne change les statuts que sur les occurences qui sont hors de blocs intégrales
             if (!estProtegerBloc) {
+                // L'occurence n'est pas dans un bloc de protection, on peut appliquer le statut
                 if (statut == Statut.PROTEGE && !estProtegerMot) {
                     Range t = Proteger(current);
                     newStart = t.Start;
                     int newEnd = t.End;
-                    bool estMaintenantProtegerBloc = EstProtegerBloc(t.Start);
+                    bool estMaintenantProtegerBloc = EstProtegerBloc(t.Start); // Si protection d'un mot composé
                     offsetCurrent = estMaintenantProtegerBloc ? DictionnaireDeTravail.PROTECTION_CODE_G1.Length : DictionnaireDeTravail.PROTECTION_CODE.Length;
                     offsetNext = estMaintenantProtegerBloc ? DictionnaireDeTravail.PROTECTION_CODE_G2.Length : 0;
                     if (estMaintenantProtegerBloc) { // Garder une trace du bloc integral
@@ -2581,6 +2610,10 @@ namespace fr.avh.braille.addin
                         offsetCurrent -= DictionnaireDeTravail.PROTECTION_CODE_G1.Length;
                         offsetNext -= DictionnaireDeTravail.PROTECTION_CODE_G2.Length;
                     }
+                } else if (estProtegerMot) {
+                    // Cas d'une occurence modifier après protection d'un block
+                    Range t = Abreger(current);
+                    offsetCurrent -= DictionnaireDeTravail.PROTECTION_CODE.Length;
                 }
             }
             // Sauvegarder le statut de l'occurence et les décallages de positions ajouter par le traitement
