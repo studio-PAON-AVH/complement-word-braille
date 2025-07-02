@@ -57,7 +57,6 @@ namespace fr.avh.braille.addin
             Dispatcher dispatcher = this.Dispatcher;
             dispatcher.Invoke(async () =>
             {
-                protecteur.ReanalyserDocumentSiModification();
                 var indices = await protecteur.IndicesOccurencesHorsLexique();
                 mots = new ObservableCollection<MotAfficher>(
                         protecteur.DonneesTraitement
@@ -82,7 +81,7 @@ namespace fr.avh.braille.addin
 
         private void Window_GotFocus(object sender, RoutedEventArgs e)
         {
-            if (protecteur != null) {
+            if (protecteur != null && protecteur.ReanalyserDocumentSiModification()) {
                 VueDictionnaire_Refresh();
             }
         }

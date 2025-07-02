@@ -740,7 +740,7 @@ namespace fr.avh.braille.addin
         /// <summary>
         /// FIXME : Cette fonction pose probleme en relance asynchrone (freeze de l'ui
         /// </summary>
-        public void ReanalyserDocumentSiModification()
+        public bool ReanalyserDocumentSiModification()
         {
             if (TexteEnMemoire != DocumentMainRange)
             {
@@ -812,7 +812,9 @@ namespace fr.avh.braille.addin
                         MessageBoxButton.OK
                     );
                 }
+                return true;
             }
+            return false;
         }
 
         public void ImporterUnDictionnaire(string filePath)
