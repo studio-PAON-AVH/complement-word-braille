@@ -1,0 +1,64 @@
+﻿<Window x:Class="fr.avh.braille.addin.TraitementBraille"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:local="clr-namespace:fr.avh.braille.addin"
+        mc:Ignorable="d"
+        Width="500"
+        Height="495"
+        Title="Traitement pour le braille">
+    <Grid>
+        <ProgressBar x:Name="ProgressIndicator"
+                     Height="22"
+                     Margin="5,10,5,0"
+                     VerticalAlignment="Top" />
+        <TextBox x:Name="ProgressMessages"
+                 Margin="5,37,5,10"
+                 TextWrapping="Wrap"
+                 Text=""
+                 VerticalScrollBarVisibility="Auto" />
+        <!-- <Grid Margin="5,369,5,10">
+
+            <Button Margin="5,5,0,0"
+                    Padding="5,0,5,0"
+                    IsEnabled="False"
+                    x:Name="LancerChargementDictionnaire"
+                    Click="LancerChargementDictionnaire_Click"
+                    Height="26"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Left"
+                    Width="196">Charger un fichier de décision</Button>
+            <Button Margin="5,36,0,0"
+                    Padding="5,0,5,0"
+                    IsEnabled="False"
+                    x:Name="LancerAnalysePhrases"
+                    Click="LancerAnalysePhrases_Click"
+                    HorizontalAlignment="Left"
+                    Width="196"
+                    RenderTransformOrigin="0.491,0.093"
+                    Height="26"
+                    VerticalAlignment="Top">Détecter les phrases étrangères</Button>
+            <Button Margin="0,5,5,0"
+                    Padding="5,0,5,0"
+                    IsEnabled="False"
+                    x:Name="LancerParcourMots"
+                    Click="LancerParcourMots_Click"
+                    HorizontalAlignment="Right"
+                    Width="219"
+                    Height="26"
+                    VerticalAlignment="Top">Traitement par mots</Button>
+            <Button Margin="0,39,5,0"
+                    Padding="5,0,5,0"
+                    IsEnabled="False"
+                    x:Name="LancerParcourLecture"
+                    Click="LancerParcourLecture_Click"
+                    HorizontalAlignment="Right"
+                    Width="219"
+                    Height="26"
+                    Visibility="Hidden" 
+                    VerticalAlignment="Top">Traitement à partir du curseur</Button>
+        </Grid>
+        -->
+    </Grid>
+</Window>

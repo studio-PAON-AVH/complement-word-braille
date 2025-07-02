@@ -46,8 +46,8 @@
                 </DataTemplate>
             </ComboBox.ItemTemplate>
         </ComboBox>
-        <Button x:Name="ProtegerIci" Content="Protéger (_p)" Margin="183,55,0,0" Click="ProtegerIci_Click" Height="36" VerticalAlignment="Top" HorizontalAlignment="Left" Width="121"/>
-        <Button x:Name="AbregerIci" Content="Abréger (_a)" Margin="183,96,0,0" Height="36" VerticalAlignment="Top" Click="AbregerIci_Click" HorizontalAlignment="Left" Width="121" RenderTransformOrigin="0.698,0.729"/>
+        <Button x:Name="ProtegerIci" Content="Protéger (_p)" Margin="183,55,0,0" Click="ProtegerMot_Click" Height="36" VerticalAlignment="Top" HorizontalAlignment="Left" Width="121"/>
+        <Button x:Name="AbregerIci" Content="Abréger (_a)" Margin="183,96,0,0" Height="36" VerticalAlignment="Top" Click="AbregerMot_Click" HorizontalAlignment="Left" Width="121" RenderTransformOrigin="0.698,0.729"/>
         <DataGrid x:Name="VueOccurences" AutoGenerateColumns="False" ItemsSource="{Binding Path=.}" Margin="11,33,9,11" CanUserAddRows="false" AlternatingRowBackground="WhiteSmoke" RowBackground="White" BorderBrush="Transparent" GridLinesVisibility="None" SelectionChanged="VueOccurences_SelectionChanged" Grid.Row="1">
             <DataGrid.Resources>
                 <Style TargetType="{x:Type DataGridCell}">

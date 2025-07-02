@@ -36,7 +36,9 @@
         {
             this.protectorRibbonAVH = this.Factory.CreateRibbonTab();
             this.BrailleActions = this.Factory.CreateRibbonGroup();
-            this.analyzeDocument = this.Factory.CreateRibbonButton();
+            this.LancerTraitement = this.Factory.CreateRibbonButton();
+            this.MotsHorsLexique = this.Factory.CreateRibbonButton();
+            this.ChargerDecisions = this.Factory.CreateRibbonButton();
             this.InfoSelection = this.Factory.CreateRibbonGroup();
             this.MotSelectionner = this.Factory.CreateRibbonLabel();
             this.Progression = this.Factory.CreateRibbonLabel();
@@ -76,17 +78,35 @@
             // 
             // BrailleActions
             // 
-            this.BrailleActions.Items.Add(this.analyzeDocument);
+            this.BrailleActions.Items.Add(this.LancerTraitement);
+            this.BrailleActions.Items.Add(this.MotsHorsLexique);
+            this.BrailleActions.Items.Add(this.ChargerDecisions);
             this.BrailleActions.Label = "Actions";
             this.BrailleActions.Name = "BrailleActions";
             // 
-            // analyzeDocument
+            // LancerTraitement
             // 
-            this.analyzeDocument.ControlSize = Microsoft.Office.Core.RibbonControlSize.RibbonControlSizeLarge;
-            this.analyzeDocument.Label = "&Lancer le traitement";
-            this.analyzeDocument.Name = "analyzeDocument";
-            this.analyzeDocument.ShowImage = true;
-            this.analyzeDocument.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.AnalyserDocument_Click);
+            this.LancerTraitement.ControlSize = Microsoft.Office.Core.RibbonControlSize.RibbonControlSizeLarge;
+            this.LancerTraitement.Label = "&Lancer le traitement";
+            this.LancerTraitement.Name = "LancerTraitement";
+            this.LancerTraitement.ShowImage = true;
+            this.LancerTraitement.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.LancerTraitementMots_Click);
+            // 
+            // MotsHorsLexique
+            // 
+            this.MotsHorsLexique.ControlSize = Microsoft.Office.Core.RibbonControlSize.RibbonControlSizeLarge;
+            this.MotsHorsLexique.Label = "&Mots hors lexique";
+            this.MotsHorsLexique.Name = "MotsHorsLexique";
+            this.MotsHorsLexique.ShowImage = true;
+            this.MotsHorsLexique.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.MotsHorsLexique_Click);
+            // 
+            // ChargerDecisions
+            // 
+            this.ChargerDecisions.ControlSize = Microsoft.Office.Core.RibbonControlSize.RibbonControlSizeLarge;
+            this.ChargerDecisions.Label = "&Charger des décisions";
+            this.ChargerDecisions.Name = "ChargerDecisions";
+            this.ChargerDecisions.ShowImage = true;
+            this.ChargerDecisions.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.ChargerDecisions_Click);
             // 
             // InfoSelection
             // 
@@ -233,7 +253,6 @@
 
         internal Microsoft.Office.Tools.Ribbon.RibbonTab protectorRibbonAVH;
         internal Microsoft.Office.Tools.Ribbon.RibbonGroup BrailleActions;
-        internal Microsoft.Office.Tools.Ribbon.RibbonButton analyzeDocument;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton AfficherDictionnaire;
         internal Microsoft.Office.Tools.Ribbon.RibbonGroup Navigation;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton OccurencePrecedente;
@@ -250,6 +269,9 @@
         internal Microsoft.Office.Tools.Ribbon.RibbonButton AbregerSelection;
         internal Microsoft.Office.Tools.Ribbon.RibbonGroup Options;
         internal Microsoft.Office.Tools.Ribbon.RibbonButton OuvrirOptions;
+        internal Microsoft.Office.Tools.Ribbon.RibbonButton ChargerDecisions;
+        internal Microsoft.Office.Tools.Ribbon.RibbonButton LancerTraitement;
+        internal Microsoft.Office.Tools.Ribbon.RibbonButton MotsHorsLexique;
     }
 
     partial class ThisRibbonCollection

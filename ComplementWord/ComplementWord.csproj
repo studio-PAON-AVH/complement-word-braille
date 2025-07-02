@@ -27,7 +27,7 @@
     <NoStandardLibraries>false</NoStandardLibraries>
     <RootNamespace>fr.avh.braille.addin</RootNamespace>
     <AssemblyName>avh-braille-word</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
     <DefineConstants>VSTO40</DefineConstants>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
@@ -47,6 +47,7 @@
     <FriendlyName>Complément braille pour Word</FriendlyName>
     <OfficeApplicationDescription>Complément pour la préparation de manuscrit pour les exports en braille abrégé dans Duxburry</OfficeApplicationDescription>
     <LoadBehavior>3</LoadBehavior>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.8">
@@ -177,7 +178,10 @@
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="UIAutomationProvider" />
+    <Reference Include="UIAutomationTypes" />
     <Reference Include="WindowsBase" />
+    <Reference Include="WindowsFormsIntegration" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.Office.Tools.v4.0.Framework, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
@@ -232,13 +236,19 @@
   -->
   <ItemGroup>
     <Compile Include="AddinUpdater.cs" />
+    <Compile Include="ListeMotsHorsLexique.xaml.cs">
+      <DependentUpon>ListeMotsHorsLexique.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OptionsComplement.cs" />
+    <Compile Include="ProtectionInteractiveParOccurenceDialog.xaml.cs">
+      <DependentUpon>ProtectionInteractiveParOccurenceDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ProtectionWord.cs" />
     <Compile Include="FormulaireOptionsComplement.xaml.cs">
       <DependentUpon>FormulaireOptionsComplement.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ProgressDialog.xaml.cs">
-      <DependentUpon>ProgressDialog.xaml</DependentUpon>
+    <Compile Include="TraitementBraille.xaml.cs">
+      <DependentUpon>TraitementBraille.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
@@ -297,7 +307,15 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="ProgressDialog.xaml">
+    <Page Include="ListeMotsHorsLexique.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ProtectionInteractiveParOccurenceDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="TraitementBraille.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -9,34 +9,6 @@ using System.Windows.Controls;
 
 namespace fr.avh.braille.dictionnaire
 {
-
-    public class MotAfficher
-    {
-        private static Dictionary<string, Statut> _statuts = new Dictionary<string, Statut> {
-            { "Inconnu", Statut.INCONNU },
-            { "Abréger", Statut.ABREGE },
-            { "Protéger", Statut.PROTEGE },
-            { "Ignorer", Statut.IGNORE }
-        };
-        private static Dictionary<Statut, string> _revert = _statuts.ToDictionary((kvp) => kvp.Value, (kvp) => kvp.Key);
-        public string[] StatutsPossible { get => _statuts.Keys.ToArray(); }
-
-        public string StatutChoisi { 
-            get => _revert[Statut]; 
-            set { 
-                Statut = _statuts[value];
-            }
-        }
-
-        public string Texte { get; set; }
-
-        public string ContexteAvant { get; set; } = null;
-        public string ContexteApres { get; set; } = null;
-        public string Contexte { get; set; } = null;
-        public Statut Statut { get; set; }
-
-        public int Index { get; set; }
-    }
     /// <summary>
     /// Logique d'interaction pour EditeurDictionnaireDeTravail.xaml
     /// </summary>
@@ -97,7 +69,7 @@ namespace fr.avh.braille.dictionnaire
             Title = $"Édition du dictionnaire {Path.GetFileName(dictionnairePath)}";
             this.dictionnairePath = dictionnairePath;
             NameDictionnaire.Content = "Chargement ...";
-            DictionnaireDeTravail.FromDictionnaryFile(dictionnairePath)
+            DictionnaireDeTravail.FromDictionnaryFileJSON(dictionnairePath)
                 .ContinueWith((task) => {
                     dictionnaire = task.Result;
                     Dispatcher.Invoke(() =>
@@ -182,7 +154,7 @@ namespace fr.avh.braille.dictionnaire
                 protecteur?.AppliquerStatutSurOccurence(selected.Index, selected.Statut);
                 
                 if (this.dictionnairePath.Length > 0 && Directory.Exists(Path.GetDirectoryName(dictionnairePath))) {
-                    dictionnaire.Save(new DirectoryInfo(Path.GetDirectoryName(dictionnairePath)));
+                    dictionnaire.SaveJSON(new DirectoryInfo(Path.GetDirectoryName(dictionnairePath)));
                 }
             }
         }

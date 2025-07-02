@@ -10,6 +10,12 @@ using fr.avh.braille.dictionnaire;
 using fr.avh.braille.dictionnaire.Entities;
 using fr.avh.archivage;
 using System.Windows;
+using System.Threading.Tasks;
+using Task = System.Threading.Tasks.Task;
+using NHibernate.Mapping.ByCode;
+using System.Windows.Documents;
+using System.Windows.Threading;
+using Antlr.Runtime;
 
 namespace fr.avh.braille.addin
 {
@@ -18,69 +24,11 @@ namespace fr.avh.braille.addin
     /// </summary>
     public class ProtectionWord : IProtection
     {
-        /// <summary>
-        ///
-        /// </summary>
-        private static readonly string PROTECTION_CODE = "[[*i*]]";
-        private static readonly string SEPARATORS = "\"\'\\t\\f\\v\\r\\n\\[\\]\\(\\);,.:  ";
         private static readonly string MIN = "a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüý";
         private static readonly string MAJ = "A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ";
         private static readonly string NUM = "0-9";
         private static readonly string ALPHANUM = $"{MIN}{MAJ}{NUM}_"; // == a-zàáâãäåæçèéêëìíîïðñòóôõöøùúûüýA-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ0-9_
-        private static readonly string REG_CS = "\\[\\[\\*"; // Debut de code duxburry
-        private static readonly string REG_CE = "\\*\\]\\]"; // Fin de code duxburry
-        private static readonly string WORD_WITH_NUMBERS_PATTERN =
-            $"({REG_CS}i{REG_CE})?"
-            + // Code duxburry de protection optionnel (récupérer dans le groupe 1) (0 ou 1)
-            $"(?<!{REG_CS})"
-            + // Negative lookbehind (ne pas match le texte commençant par un indicateur de code duxburry)
-            $"("
-            + $"\\b"
-            + // Debut de mot (word boundary)
-            $"[{NUM}{MIN}{MAJ}]*"
-            + // Chiffre ou lettre (0 ou n)
-            $"("
-            + $"[{MIN}{MAJ}][{NUM}]"
-            + // Lettre suivie d'un chiffre
-            $"|"
-            + $"[{NUM}][{MIN}{MAJ}]"
-            + // Chiffre suivie d'une lettre
-            $")+"
-            + // Motif Chiffre+Lettre ou lettre+chiffre (1 ou n)
-            $"[{NUM}{MIN}{MAJ}]*"
-            + // suivi de chiffres ou de lettres (0 ou n)
-            $"(?!{REG_CE})"
-            + // Negative lookahead (ne pas match de texte suivi d'une fin de code duxburry)
-            $"\\b"
-            + // Fin de mot (word boundary)
-            $")";
-
-
-        /// <summary>
-        /// Motif de recherche de mots contenant au moins 1 majuscule : <br/>
-        /// = début de ligne ou caractère non alphanumérique,<br/>
-        /// puis optionnellement suivi d'un code de protection,<br/>
-        /// puis optionnellement suivi d'un groupe contenant <br/>
-        ///    0 ou N caractère majuscule ou minuscule,<br/>
-        ///    suivi d'un groupe contenant au choix<br/>
-        ///    - soit une ou plusieurs (minuscules ou majuscule ou tiret) suivie d'une majuscule<br/>
-        ///    - soit une majuscule suivi d'une ou plusieurs(minuscules ou majuscule ou tiret) <br/>
-        ///    suivi de 0 ou N caractère minuscule, majuscule, underscore ou tiret<br/>
-        ///    et suivi d'un caractère (non alphanumérique y compris sans apostrophe pour éviter les prefix en Qu' et C') ou de la fin de ligne
-        /// </summary>
-        private static readonly string WORD_WITH_CAPITAL_PATTERN =
-            $"(?<=[^{ALPHANUM}-]|^)" // group 1 linestart or non alphanum character
-            + $"({REG_CS}i{REG_CE})?" // group 2 Optional protection code
-            + $"(" // group 3 : searched word
-            + $"[{MIN}{MAJ}_-]*" // optionnal prefix
-            + $"(" // Group 4: one or more capital letters and at least one other letter
-            + $"[{MIN}{MAJ}-]+[{MAJ}]"
-            + $"|[{MAJ}][{MIN}{MAJ}-]+"
-            + $")" // end group 4
-            + $"[{MIN}{MAJ}_-]*" // optionnal suffix
-            + $")+" // end group 3
-            + $"(?=[^{ALPHANUM}'’-]|$)"; // group 5 separator (non alphanum character, no apostrophes, or end of line)
-
+        
         /// <summary>
         /// Motif de recherche de mot(s)
         /// </summary>
@@ -99,41 +47,7 @@ namespace fr.avh.braille.addin
             );
         }
 
-        /// <summary>
-        /// Recherche des mots contenant un chiffre <br/>
-        /// (lettre minuscule ou majuscul précédé ou suivi d'un chiffre)<br/>
-        /// Goupes :<br/>
-        /// - [1] : recup du code de protection s'il existe<br/>
-        /// - [2] : le mot contenant un ou plusieurs nombre
-        ///
-        /// </summary>
-        private static readonly Regex WORD_WITH_NUMBERS = new Regex(
-            WORD_WITH_NUMBERS_PATTERN,
-            RegexOptions.Compiled | RegexOptions.Singleline
-        );
 
-        /// <summary>
-        /// Recherche tous les mots contenant au moins une majuscule
-        /// Goupes :<br/>
-        /// - [1] : recup du code de protection s'il existe<br/>
-        /// - [2] : le mot contenant une ou plusieurs majuscules
-        /// </summary>
-        private static readonly Regex WORD_WITH_CAPITAL = new Regex(
-            WORD_WITH_CAPITAL_PATTERN,
-            RegexOptions.Compiled | RegexOptions.Singleline
-        );
-
-        /// <summary>
-        /// Liste globale des occurences de mots a protégé obligatoirement
-        /// (tel que présenté dans le document dans leur ordre d'apparition) <br/>
-        /// voir la regex wordWithNumbers
-        /// </summary>
-        public List<string> occurencesToProtect { get; } = new List<string>();
-
-        /// <summary>
-        /// Pour chaque indice de occurencesToProtect, indique sur l'occurence est déjà protégé ou non
-        /// </summary>
-        public List<bool> occurencesToProtectStatus { get; } = new List<bool>();
 
         /// <summary>
         /// Dictionnaire de travail pour conserver les actions fait sur les mots <br/>
@@ -142,63 +56,75 @@ namespace fr.avh.braille.addin
         /// - 2 : protégé globalement<br/>
         /// - 3 : ambigu, traitement au cas par cas par occurence dans le titre<br/>
         /// </summary>
-        public DictionnaireDeTravail WorkingDictionnary = null;
+        public DictionnaireDeTravail DonneesTraitement = null;
 
         public string WorkingDictionnaryPath = null;
 
-        public string ResumePath = null;
 
         public delegate void OnSelectionChanged(int selectedOccurence);
 
         public event OnSelectionChanged SelectionChanged;
 
-        private int _selectedOccurence = 0;
+        private int _selectedOccurence = -1;
 
         /// <summary>
         /// Occurence sélectionné (indice des listes WorkingDictionnary.occurences et occurenceSelectedAction)
         /// </summary>
-        public int SelectedOccurence
+        public int Occurence
         {
             get => _selectedOccurence;
             private set
             {
                 _selectedOccurence = value;
+                DonneesTraitement.DerniereOccurenceSelectionnee = value;
                 SelectionChanged?.Invoke(value);
             }
         }
-        public Statut SelectedOccurenceStatut
-        {
-            get => WorkingDictionnary.StatutsOccurences[_selectedOccurence];
-            set => WorkingDictionnary.StatutsOccurences[_selectedOccurence] = value;
+
+
+        public string MotSelectionne {
+            get { return DonneesTraitement.Occurences[Occurence].ToLower(); }
+            set
+            {
+                if (DonneesTraitement.CarteMotOccurences.ContainsKey(value.ToLower().Trim())) {
+                    Occurence = DonneesTraitement.CarteMotOccurences[value.ToLower().Trim()][0];
+                } else {
+                    throw new Exception($"Le mot {value} n'est pas dans le dictionnaire de travail");
+                }
+            }
         }
 
-        public bool SelectedOccurenceEstTraitee
+        public Statut StatutOccurence
         {
-            get => WorkingDictionnary.StatutsAppliquer[_selectedOccurence];
-            set => WorkingDictionnary.StatutsAppliquer[_selectedOccurence] = value;
+            get => DonneesTraitement.StatutsOccurences[_selectedOccurence];
+            set => DonneesTraitement.StatutsOccurences[_selectedOccurence] = value;
         }
+
+        public bool OccurenceEstTraitee
+        {
+            get => DonneesTraitement.StatutsAppliquer[_selectedOccurence];
+            set => DonneesTraitement.StatutsAppliquer[_selectedOccurence] = value;
+        }
+
+
 
         public int SelectedWordIndex
         {
             get
             {
-                string wordSelected = WorkingDictionnary.Occurences[SelectedOccurence].ToLower();
-                return WorkingDictionnary.CarteMotOccurences.Keys.ToList().IndexOf(wordSelected);
+                string wordSelected = DonneesTraitement.Occurences[Occurence].ToLower();
+                return DonneesTraitement.CarteMotOccurences.Keys.ToList().IndexOf(wordSelected);
             }
         }
 
-        public string SelectedWord
-        {
-            get { return WorkingDictionnary.Occurences[SelectedOccurence].ToLower(); }
-        }
 
         public int SelectedWordOccurenceIndex
         {
             get
             {
-                string wordSelected = WorkingDictionnary.Occurences[SelectedOccurence].ToLower();
-                return WorkingDictionnary.CarteMotOccurences[wordSelected].IndexOf(
-                    SelectedOccurence
+                string wordSelected = DonneesTraitement.Occurences[Occurence].ToLower();
+                return DonneesTraitement.CarteMotOccurences[wordSelected].IndexOf(
+                    Occurence
                 );
             }
         }
@@ -207,16 +133,30 @@ namespace fr.avh.braille.addin
         {
             get
             {
-                string wordSelected = WorkingDictionnary.Occurences[SelectedOccurence].ToLower();
-                return WorkingDictionnary.CarteMotOccurences[wordSelected].Count;
+                string wordSelected = DonneesTraitement.Occurences[Occurence].ToLower();
+                return DonneesTraitement.CarteMotOccurences[wordSelected].Count;
             }
         }
 
         public MSWord.Document _document { get; } = null;
 
+        public int PositionCurseur {
+            get {
+                if (_document != null && _document.Application != null) {
+                    return _document.Application.Selection.Start;
+                } else return 0;
+            }
+        }
+
         public IList<Mot> alreadyInDB { get; private set; }
 
-        public string TexteEnMemoire { get; private set; } = null;
+        private string _texteEnMemoire = "";
+        public string TexteEnMemoire {
+            get { return _texteEnMemoire; }
+            private set {
+                _texteEnMemoire = string.Copy(value);
+            }
+        }
 
         /// <summary>
         /// Récupère le contenu texte du document, mais retraité pour matcher la selection par range
@@ -251,17 +191,22 @@ namespace fr.avh.braille.addin
             Directory.CreateDirectory(tempDirectory);
             object notReadOnly = false;
             string filename = document.FullName;
-            string dicName = Path.GetFileNameWithoutExtension(filename) + ".bdic";
-            WorkingDictionnaryPath = Path.Combine(Path.GetDirectoryName(filename), dicName);
-            ResumePath = Path.Combine(
-                Path.GetDirectoryName(filename),
-                Path.GetFileNameWithoutExtension(filename) + ".resume"
-            );
+            string dicName = Path.GetFileNameWithoutExtension(filename) + ".json";
+            WorkingDictionnaryPath = Path.Combine(fr.avh.braille.dictionnaire.Globals.AppData.FullName, dicName);
+            try {
+                if (Directory.Exists(Path.GetDirectoryName(filename))) {
+                    WorkingDictionnaryPath = Path.Combine(Path.GetDirectoryName(filename), dicName);
+                }
+            } catch(Exception e) {
+               // Stocker le dictionnaire dans le dossier AppData
+            }
+            
 
             if (document != null)
             {
                 _document = document;
                 AnalyserDocument();
+                
             }
             else
             {
@@ -269,11 +214,60 @@ namespace fr.avh.braille.addin
             }
         }
 
+
+        public static IEnumerable<int> AllIndexesOf(string str, string searchstring)
+        {
+            int minIndex = str.IndexOf(searchstring);
+            while (minIndex != -1) {
+                yield return minIndex;
+                minIndex = str.IndexOf(searchstring, minIndex + 1);
+            }
+        }
+
+        /// <summary>
+        /// Protege un document pour eviter l'écriture
+        /// (Pour plus tard quand on passera un task panel)
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        public void ProtectDocument()
+        {
+            if (_document != null) {
+                // On protège le document
+                _document.Protect(
+                    WdProtectionType.wdAllowOnlyReading,false, System.String.Empty, false, false
+                );
+            } else {
+                throw new Exception("Impossible de protéger le document, il n'est pas chargé");
+            }
+        }
+
+        /// <summary>
+        /// Reautorise l'écriture dans le document word
+        /// </summary>
+        /// <exception cref="Exception"></exception>
+        public void UnProtectDocument()
+        {
+            if (_document != null) {
+                // On protège le document
+                _document.Unprotect(String.Empty);
+            } else {
+                throw new Exception("Impossible de protéger le document, il n'est pas chargé");
+            }
+        }
+
+
+        /// <summary>
+        /// Analyse le document word et enregistre les mots identifiés dans le dictionnaire de travail <br/>
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         public void AnalyserDocument()
         {
             int baseStepNumber = 9;
             if (_document != null)
             {
+
+                // Par défaut, si la preprotection automatique est activé, on reapplique les décisions du précédent dictionnaire
+                bool reapplyDecisions = OptionsComplement.Instance.ActiverPreProtectionAuto; ;
                 // Sauvegarde du précédent dictionnaire s'il existe
                 DictionnaireDeTravail existingDictionnary = null;
                 try
@@ -285,26 +279,34 @@ namespace fr.avh.braille.addin
                             new Tuple<int, int>(0, baseStepNumber)
                         );
                         System.Threading.Tasks.Task<DictionnaireDeTravail> init =
-                            DictionnaireDeTravail.FromDictionnaryFile(WorkingDictionnaryPath);
+                            DictionnaireDeTravail.FromDictionnaryFileJSON(WorkingDictionnaryPath);
                         init.Wait();
                         existingDictionnary = init.Result;
                         info?.Invoke(
                             $"Dictionnaire chargé",
                             new Tuple<int, int>(1, baseStepNumber)
                         );
+                        if (!reapplyDecisions) {
+                            var res = MessageBox.Show("Souhaitez-vous que les décisions du précédent dictionnaire sur le document soient réappliquer ?" +
+                                "\r\nCeci n'est pas obligatoire si le document a été sauvegarder après le précédent traitement du braille.",
+                                "Chargement réussi",
+                                MessageBoxButton.YesNo,
+                                MessageBoxImage.Question,
+                                // Obligatoire pour forcer la mise en premier plan ici
+                                MessageBoxResult.No,
+                                MessageBoxOptions.DefaultDesktopOnly
+                            );
+                            reapplyDecisions = res == MessageBoxResult.Yes;
+                        }
+                        
                     }
                 }
                 catch (Exception)
-                {
-                    //WorkingDictionnary = new DictionnaireDeTravail(dicName);
-                    //info?.Invoke(
-                    //    $"Nouveau fichier de dictionnaire {dicName}",
-                    //    new Tuple<int, int>(0, baseStepNumber)
-                    //);
-                    //WorkingDictionnary.Save(new DirectoryInfo(Path.GetDirectoryName(filename)));
+                { 
+
                 }
-                WorkingDictionnary = new DictionnaireDeTravail(
-                    Path.GetFileNameWithoutExtension(WorkingDictionnaryPath) + ".bdic"
+                DonneesTraitement = new DictionnaireDeTravail(
+                    Path.GetFileNameWithoutExtension(WorkingDictionnaryPath)
                 );
 
                 info?.Invoke(
@@ -313,224 +315,17 @@ namespace fr.avh.braille.addin
                 );
 
                 info?.Invoke(
-                    $"Copie du texte en mémoire...",
+                    $" Copie du texte en mémoire...",
                     new Tuple<int, int>(3, baseStepNumber)
                 );
-                TexteEnMemoire = DocumentMainRange;
+                ChargerTexteEnMemoire();
 
-                // remise en 1 ligne du contenu pour analyse on remplace tous les retours chariot ou new line par des espaces
                 info?.Invoke(
-                    $"Recherche des mots contenant des chiffres...",
+                    $"Analyse et extractions des mots à traiter ...",
                     new Tuple<int, int>(4, baseStepNumber)
                 );
+                AnalyseDuTexteEnMemoire();
 
-                // List des mots à analyser :
-                // Tous les mots de plus de 1 caractère et contenant au choix
-                // - des chiffres et des lettres (a proteger systématiquement)
-                // - au moins une majuscule
-                MatchCollection result = WORD_WITH_NUMBERS.Matches(TexteEnMemoire);
-                if (result.Count > 0)
-                {
-                    info?.Invoke(
-                        $"{result.Count} mots contenant des chiffres a protéger",
-                        new Tuple<int, int>(5, baseStepNumber)
-                    );
-                    foreach (Match item in result)
-                    {
-                        if (!occurencesToProtect.Contains(item.Groups[2].Value))
-                        {
-                            occurencesToProtect.Add(item.Groups[2].Value);
-                        }
-                    }
-
-                    info?.Invoke(
-                        $"Protection automatique des mots contenants des chiffres ...",
-                        new Tuple<int, int>(7, baseStepNumber)
-                    );
-
-                    foreach (string item in occurencesToProtect)
-                    {
-                        // preprotection
-                        MSWord.Range protectionRange = _document.StoryRanges[
-                            WdStoryType.wdMainTextStory
-                        ];
-                        var finder = protectionRange.Find;
-                        finder.ClearFormatting();
-                        finder.Text = item;
-                        finder.Forward = true;
-                        finder.MatchCase = true;
-                        while (finder.Execute())
-                        {
-                            int position = protectionRange.Start;
-                            if (!EstProteger(_document, protectionRange))
-                            {
-                                // Protéger le texte
-                                Proteger(protectionRange);
-                            }
-                        }
-                    }
-                    _document.Save();
-                    // remise a 0 du texte en mémoire pour les analyses qui suivent
-                    TexteEnMemoire = DocumentMainRange;
-                }
-                else
-                {
-                    info?.Invoke(
-                        $"Pas de mots contenant des chiffres détecté",
-                        new Tuple<int, int>(5, baseStepNumber)
-                    );
-                }
-
-                info?.Invoke(
-                    $"Recherche des mots contenant des majuscules ...",
-                    new Tuple<int, int>(5, baseStepNumber)
-                );
-                result = WORD_WITH_CAPITAL.Matches(TexteEnMemoire);
-                List<string> motsIdentifes = new List<string>();
-                if (result.Count > 0)
-                {
-                    info?.Invoke(
-                        $"{result.Count} occurences de mots contenant des majuscule, filtrage des mots abrégeables ..",
-                        new Tuple<int, int>(6, baseStepNumber)
-                    );
-
-                    int t = 0;
-                    foreach (Match item in result)
-                    {
-                        info?.Invoke($"", new Tuple<int, int>(t, result.Count));
-                        t++;
-                        bool isAlreadyProtected = item.Groups[1].Success;
-                        string foundWord = item.Groups[2].Value;
-                        int indexInText = item.Groups[2].Index;
-                        string wordKey = foundWord.ToLower().Trim();
-                        // Si le mot est abrégeable
-                        if (Abreviation.EstAbregeable(wordKey) && !motsIdentifes.Contains(wordKey))
-                        {
-                            motsIdentifes.Add(wordKey);
-                        }
-                    }
-                    info?.Invoke(
-                        $"{motsIdentifes.Count} mots abrégeables ajoutés a la recherche",
-                        new Tuple<int, int>(6, baseStepNumber)
-                    );
-                }
-                else
-                {
-                    info?.Invoke(
-                        $"Pas de mots contenant des majuscules détectés",
-                        new Tuple<int, int>(6, baseStepNumber)
-                    );
-                }
-
-                info?.Invoke(
-                    $"Récupération des mots abrégeables communs au français et au moins une autre langue ...",
-                    new Tuple<int, int>(6, baseStepNumber)
-                );
-
-                List<string> motsAToujourRechercher = new List<string>();
-                using (var session = BaseSQlite.CreateSessionFactory(info, error).OpenSession())
-                {
-                    motsAToujourRechercher = session
-                        .QueryOver<Mot>()
-                        .Where(
-                            m => m.ToujoursDemander == 1 /*&& Abbreviation.EstAbregeable(m.Texte)*/
-                        )
-                        .List()
-                        .Distinct()
-                        .Select(m => m.Texte.ToLower())
-                        .ToList();
-                }
-                motsAToujourRechercher = motsAToujourRechercher
-                    .Distinct()
-                    .Where(m => Abreviation.EstAbregeable(m))
-                    .ToList();
-                info?.Invoke(
-                    $"{motsAToujourRechercher.Count} mots abrégeables ajoutés a la recherche",
-                    new Tuple<int, int>(6, baseStepNumber)
-                );
-
-                // NP 2024/11/20 : Rechargement des mots ajouter dans le dictionnaire précédent
-                List<string> wordsToAdd = new List<string>();
-                if (existingDictionnary != null)
-                {
-                    info?.Invoke(
-                        $"Rechargement des mots issus de la dernière sauvegarde du dictionnaire (mots ajoutés et mots étrangers) ...",
-                        new Tuple<int, int>(6, baseStepNumber)
-                    );
-
-                    wordsToAdd = existingDictionnary.CarteMotOccurences.Keys.ToList();
-                }
-                else
-                {
-                    wordsToAdd = GetMotsEtrangers();
-                }
-
-                info?.Invoke(
-                    $"{wordsToAdd.Count} mots abrégeables ajoutés a la recherche",
-                    new Tuple<int, int>(6, baseStepNumber)
-                );
-
-                List<string> totalMotsATraiter = new List<string>();
-                totalMotsATraiter = motsIdentifes
-                    .Concat(motsAToujourRechercher)
-                    .Concat(wordsToAdd)
-                    .Distinct()
-                    .ToList();
-
-                info?.Invoke(
-                    $"Recherche de toutes les occurences de {totalMotsATraiter.Count} mots répertoriés...",
-                    new Tuple<int, int>(6, baseStepNumber)
-                );
-                AjouterListeMotsAuTraitement(totalMotsATraiter);
-                // repasser les occurences des mots minuscules identifiés en ignorer
-                foreach (var word in motsIdentifes)
-                {
-                    string wordKey = word.ToLower().Trim();
-                    if (WorkingDictionnary.CarteMotOccurences.ContainsKey(wordKey))
-                    {
-                        foreach (
-                            var occurenceFound in WorkingDictionnary.CarteMotOccurences[wordKey]
-                        )
-                        {
-                            if (WorkingDictionnary.Occurences[occurenceFound] == wordKey)
-                            {
-                                // ignorer toutes les versions en minuscules du mot
-                                WorkingDictionnary.StatutsOccurences[occurenceFound] =
-                                    Statut.IGNORE;
-                            }
-                            else
-                            {
-                                //
-                            }
-                        }
-                    }
-                }
-                // Repasser tous les mots a toujorus rechercher en inconnu
-                for (int i = 0; i < motsAToujourRechercher.Count; i++)
-                {
-                    // repasser les mots en question en inconnu s'ils ont été précédemment traité
-                    if (
-                        WorkingDictionnary.CarteMotOccurences.ContainsKey(motsAToujourRechercher[i])
-                    )
-                    {
-                        foreach (
-                            var occurence in WorkingDictionnary.CarteMotOccurences[
-                                motsAToujourRechercher[i]
-                            ]
-                        )
-                        {
-                            WorkingDictionnary.StatutsOccurences[occurence] = Statut.INCONNU;
-                        }
-                    }
-                }
-                foreach (var kv in WorkingDictionnary.CarteMotOccurences)
-                {
-                    info?.Invoke($"- {kv.Key} : {kv.Value.Count} occurences");
-                }
-
-                info?.Invoke(
-                    $"{WorkingDictionnary.CarteMotOccurences.Keys.Count} mots trouvés, ({WorkingDictionnary.Occurences.Count}) occurences à traiter"
-                );
 
                 info?.Invoke(
                     $"Récupérations des statistiques des mots détectés ...",
@@ -541,197 +336,218 @@ namespace fr.avh.braille.addin
                     alreadyInDB = session
                         .QueryOver<Mot>()
                         .WhereRestrictionOn(m => m.Texte)
-                        .IsIn(WorkingDictionnary.CarteMotOccurences.Keys.ToList())
+                        .IsIn(DonneesTraitement.CarteMotOccurences.Keys.ToList())
                         .List();
-
-                    // Pré marquage des mots
-                    if (OptionsComplement.Instance.ActiverPreProtectionAuto)
-                    {
-                        info?.Invoke(
-                            $"Pré-marquage des mots et trouvés dans la base statistique ...",
+                    var decisionsParDefaut = session.QueryOver<DecisionParDefaut>()
+                        .WhereRestrictionOn(d => d.Mot)
+                        .IsIn(DonneesTraitement.CarteMotOccurences.Keys.ToList())
+                        .List();
+                    info?.Invoke(
+                            $"Pré-décision en utilisant la base de donnée des décisions ...",
                             new Tuple<int, int>(6, baseStepNumber)
                         );
-                        // Ne pas pré marquer les mots ayant été détecté moins de 100 fois
-                        // et dont la certitute de résolution est inférieur a 90%
-                        int documentBarrier = 100;
-                        foreach (var item in alreadyInDB)
-                        {
-                            if (item.ToujoursDemander == 1)
-                            {
-                                // Mots particuliers pour lequel le transcripteur doit vérifier son utilisation contextuellement
-                                // (Par exemple, les mots existant dans plusieurs langues)
-                                //WorkingDictionnary.mots[item.Texte] = Statut.AMBIGU;
-                            }
-                            else if (
-                                item.Documents > documentBarrier
-                                && Math.Max(item.Abreviations, item.Protections) > 0
-                            )
-                            {
-                                double certainty =
-                                    1.00
-                                    - (
-                                        (double)Math.Min(item.Abreviations, item.Protections)
-                                        / (double)Math.Max(item.Abreviations, item.Protections)
-                                    );
-                                if (
-                                    certainty > 0.99
-                                    && WorkingDictionnary.StatutMot(item.Texte) == Statut.INCONNU
-                                )
-                                {
-                                    Statut selected =
-                                        item.Abreviations > item.Protections
-                                            ? Statut.ABREGE
-                                            : Statut.PROTEGE;
-                                    // Ne mettre a jour que les mots non traité au cas ou on serait sur une reprise de traitement
-                                    foreach (
-                                        var index in WorkingDictionnary.CarteMotOccurences[
-                                            item.Texte
-                                        ]
-                                    )
-                                    {
-                                        if (
-                                            WorkingDictionnary.StatutsOccurences[index]
-                                            == Statut.INCONNU
-                                        )
-                                            WorkingDictionnary.StatutsOccurences[index] = selected;
-                                    }
+                    // Ne pas pré marquer les mots ayant été détecté moins de 100 fois
+                    // et dont la certitute de résolution est inférieur a 90%
+                    //int documentBarrier = 100;
+                    foreach (var item in alreadyInDB) {
+                        if (item.ToujoursDemander == 1) {
+                            // Mots particuliers pour lequel le transcripteur doit vérifier son utilisation contextuellement
+                            // (Par exemple, les mots existant dans plusieurs langues)
+                            //WorkingDictionnary.mots[item.Texte] = Statut.AMBIGU;
+                        } else {
+                            if (item.Protections == 0) {
+                                foreach (
+                                    var index in DonneesTraitement.CarteMotOccurences[
+                                        item.Texte
+                                    ]
+                                ) {
+                                    DonneesTraitement.StatutsOccurences[index] = Statut.ABREGE;
+                                }
+                            } else if (item.Abreviations == 0) {
+                                foreach (
+                                    var index in DonneesTraitement.CarteMotOccurences[
+                                        item.Texte
+                                    ]
+                                ) {
+                                    DonneesTraitement.StatutsOccurences[index] = Statut.PROTEGE;
+                                }
+                            } else {
+                                char d = decisionsParDefaut.FirstOrDefault(p => p.Mot == item.Texte)?.Decision ?? ' ';
+                                switch (d) {
+                                    case 'a':
+                                        foreach (
+                                            var index in DonneesTraitement.CarteMotOccurences[
+                                                item.Texte
+                                            ]
+                                        ) {
+                                            DonneesTraitement.StatutsOccurences[index] = Statut.ABREGE;
+                                        }
+                                        break;
+                                    case 'p':
+                                        foreach (
+                                            var index in DonneesTraitement.CarteMotOccurences[
+                                                item.Texte
+                                            ]
+                                        ) {
+                                            DonneesTraitement.StatutsOccurences[index] = Statut.PROTEGE;
+                                        }
+                                        break;
+                                    case 'c':
+                                        foreach (
+                                            var index in DonneesTraitement.CarteMotOccurences[
+                                                item.Texte
+                                            ]
+                                        ) {
+                                            DonneesTraitement.StatutsOccurences[index] = Statut.INCONNU;
+                                        }
+                                        break;
+                                    default:
+                                        break;
                                 }
                             }
+                            //if (
+                            //    item.Documents > documentBarrier
+                            //    && Math.Max(item.Abreviations, item.Protections) > 0
+                            //) {
+                            //    double certainty =
+                            //        1.00
+                            //        - (
+                            //            (double)Math.Min(item.Abreviations, item.Protections)
+                            //            / (double)Math.Max(item.Abreviations, item.Protections)
+                            //        );
+                            //    if (
+                            //        certainty > 0.99
+                            //        && DonneesTraitement.StatutMot(item.Texte) == Statut.INCONNU
+                            //    ) {
+                            //        Statut selected =
+                            //            item.Abreviations > item.Protections
+                            //                ? Statut.ABREGE
+                            //                : Statut.PROTEGE;
+                            //        // Ne mettre a jour que les mots non traité au cas ou on serait sur une reprise de traitement
+                            //        foreach (
+                            //            var index in DonneesTraitement.CarteMotOccurences[
+                            //                item.Texte
+                            //            ]
+                            //        ) {
+                            //            if (
+                            //                DonneesTraitement.StatutsOccurences[index]
+                            //                == Statut.INCONNU
+                            //            )
+                            //                DonneesTraitement.StatutsOccurences[index] = selected;
+                            //        }
+                            //    }
+                            //}
                         }
+
                     }
+                    
                 }
 
+                // Rechargement du précédent dictionnaire
                 if (existingDictionnary != null)
                 {
                     info?.Invoke(
-                        $"Rechargement des décisions enregistrés dans le précédent dictionnaire...",
+                        $"Rechargement des décisions enregistrés dans le précédent dictionnaire du document...",
                         new Tuple<int, int>(6, baseStepNumber)
                     );
-
-                    // TODO : pour la suppression par les transcripteurs, remplacer la suppression par le statut ignorer
-                    // (utilisé le statut 3 et le renommer en "IGNORER")
-                    // Rechargement du dictionnaire précédent
-                    // Pour chaque mot du nouveau dictionnaire
-                    // si le mot i est le meme a l'emplacement j du précédent
-                    //  on récupère le statut du mot j
-                    //  on incrément j
-                    // sinon on passe au mot suivant dans le nouveau dictionnaire dictionnaire
-                    for (
-                        int i = 0, j = 0;
-                        i < WorkingDictionnary.Occurences.Count
-                            && j < existingDictionnary.Occurences.Count;
-                        i++
-                    )
-                    {
-                        string newWord = WorkingDictionnary.Occurences[i];
-                        string oldWord = existingDictionnary.Occurences[j];
-                        Statut oldStatut = existingDictionnary.StatutsOccurences[j];
-                        if (newWord == oldWord)
-                        {
-                            // trouvé
-                            // on recharge le statut s'il y en avait un dans l'ancien dico
-                            if (oldStatut != Statut.INCONNU)
-                            {
-                                WorkingDictionnary.StatutsOccurences[i] = oldStatut;
-                                // On recontrole si le mot a été traité (statut appliquer à vrai si protéger a l'ouverture du fichier)
-                                WorkingDictionnary.StatutsAppliquer[i] =
-                                    (
-                                        WorkingDictionnary.StatutsAppliquer[i]
-                                        && oldStatut == Statut.PROTEGE
-                                    ) // statut protégé et déjà protégé dans le document
-                                    || (
-                                        !WorkingDictionnary.StatutsAppliquer[i]
-                                        && oldStatut == Statut.ABREGE
-                                    ) // Statut abrégé et déjà abrégé dans le document
-                                    || oldStatut == Statut.IGNORE; // Statut ignorer, on reprend
-                            }
-                            // on passe au mot suivant dans l'ancien dico
-                            j++;
-                        }
-                        // sinon on passe au mot suivant dans le dictionnaire courant
-                        // (pour le moment je ne resupprime pas les mots supprimés dans le dictionnaire précédent)
+                    DonneesTraitement.RechargerDecisionDe(existingDictionnary);
+                    
+                }
+                // Pré marquage des mots
+                if (OptionsComplement.Instance.ActiverPreProtectionAuto) {
+                    info?.Invoke(
+                        $"Pre-protection automatique activer, appliquation des décisions chargées",
+                        new Tuple<int, int>(6, baseStepNumber)
+                    );
+                    SelectionnerOccurence(0);
+                    for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                        AppliquerStatutSurOccurence(i, DonneesTraitement.StatutsOccurences[i]);
                     }
                 }
 
-                // Mise en place d'un fichier de reprise de traitement
-                if (File.Exists(ResumePath))
-                {
-                    string[] resume = File.ReadAllLines(ResumePath);
-                    string mot = resume[0];
-                    bool isFinished = resume.Length > 1 && resume[1].StartsWith("--");
-                    if (WorkingDictionnary.CarteMotOccurences.ContainsKey(mot))
-                    {
-                        info?.Invoke(
+
+                if (DonneesTraitement.DernierMotSelectionne != null 
+                    && DonneesTraitement.CarteMotOccurences.ContainsKey(DonneesTraitement.DernierMotSelectionne)
+                ) {
+                    string mot = DonneesTraitement.DernierMotSelectionne;
+                    info?.Invoke(
                             $"Relancement du traitement au mot {mot}",
                             new Tuple<int, int>(9, baseStepNumber)
                         );
-                        List<string> keys = WorkingDictionnary.CarteMotOccurences.Keys.ToList();
-                        int wordCountToReprocess = isFinished
-                            ? keys.Count
-                            : keys.IndexOf(mot.ToLower());
-                        if (wordCountToReprocess > 0)
-                        {
+                    List<string> keys = DonneesTraitement.CarteMotOccurences.Keys.ToList();
+                    int wordCountToReprocess = DonneesTraitement.EstTerminer
+                        ? keys.Count
+                        : keys.IndexOf(mot.ToLower());
+                    // Si la preprotection auto n'est pas activer et que des mots doivent être rechargé
+                    if (reapplyDecisions && !OptionsComplement.Instance.ActiverPreProtectionAuto && wordCountToReprocess > 0) {
+                        info?.Invoke(
+                            $"Reprise des décisions précédentes sur {wordCountToReprocess} mots",
+                            new Tuple<int, int>(9, baseStepNumber)
+                        );
+                        for (int i = 0; i < wordCountToReprocess; i++) {
+                            string wordToCheck = keys[i];
+                            List<int> toTreat = DonneesTraitement.CarteMotOccurences[
+                                wordToCheck
+                            ]
+                                .Where(
+                                    o =>
+                                        DonneesTraitement.StatutsOccurences[o] == Statut.ABREGE
+                                        || DonneesTraitement.StatutsOccurences[o] == Statut.PROTEGE
+                                        || DonneesTraitement.StatutsOccurences[o] == Statut.IGNORE
+                                )
+                                .ToList();
                             info?.Invoke(
-                                $"Controle des décisions précédentes sur {wordCountToReprocess} mots",
+                                $"- Reapplication des décisions sur {wordToCheck} : {DonneesTraitement.CarteMotOccurences[wordToCheck].Count} occurences, {toTreat.Count} décisions à appliquer",
                                 new Tuple<int, int>(9, baseStepNumber)
                             );
-                            for (int i = 0; i < wordCountToReprocess; i++)
-                            {
-                                string wordToCheck = keys[i];
-                                List<int> toTreat = WorkingDictionnary.CarteMotOccurences[
-                                    wordToCheck
-                                ]
-                                    .Where(
-                                        o =>
-                                            WorkingDictionnary.StatutsOccurences[o] == Statut.ABREGE
-                                            || WorkingDictionnary.StatutsOccurences[o]
-                                                == Statut.PROTEGE
-                                    )
-                                    .ToList();
-                                info?.Invoke(
-                                    $"- Controle des décisions précédentes sur {wordToCheck} : {WorkingDictionnary.CarteMotOccurences[wordToCheck].Count} occurences, {toTreat.Count} décisions à appliquer",
-                                    new Tuple<int, int>(9, baseStepNumber)
-                                );
 
-                                // Parcours des occurences avec le parcours optimisé
-                                foreach (int occurence in toTreat)
-                                {
-                                    try
-                                    {
-                                        SelectionnerOccurence(occurence);
-                                        AppliquerStatutSurOccurence(
-                                            SelectedOccurence,
-                                            SelectedOccurenceStatut
-                                        );
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        MessageBox.Show(
-                                            $"L'erreur suivante s'est produite lors du contrôle de {wordToCheck}\r\n"
-                                                + e.Message
-                                        );
-                                    }
+                            // Parcours des occurences avec le parcours optimisé
+                            foreach (int occurence in toTreat) {
+                                try {
+                                    SelectionnerOccurence(occurence);
+                                    AppliquerStatutSurOccurence(
+                                        Occurence,
+                                        StatutOccurence
+                                    );
+                                }
+                                catch (Exception e) {
+                                    MessageBox.Show(
+                                        $"L'erreur suivante s'est produite lors du contrôle de {wordToCheck}\r\n"
+                                            + e.Message
+                                    );
                                 }
                             }
-                        }
-                        try
-                        {
-                            SelectionnerOccurenceMot(mot);
-                        }
-                        catch
-                        {
-                            SelectionnerOccurence(0);
+                            
+                            // Fait normalement dans le RechargerDecisionDe
+                            //else {
+                            //    foreach (int occurence in toTreat) {
+                            //        try {
+                            //            DonneesTraitement.AppliquerStatut(
+                            //                occurence,
+                            //                DonneesTraitement.StatutsOccurences[occurence]
+                            //            );
+                            //        }
+                            //        catch (Exception e) {
+                            //            MessageBox.Show(
+                            //                $"L'erreur suivante s'est produite lors du contrôle de {wordToCheck}\r\n"
+                            //                    + e.Message
+                            //            );
+                            //        }
+                            //    }
+                            //}
+                            
                         }
                     }
-                    else
-                    {
+                    try {
+                        SelectionnerOccurenceMot(mot);
+                    }
+                    catch {
                         SelectionnerOccurence(0);
                     }
-                }
-                else
-                {
+                } else {
                     SelectionnerOccurence(0);
                 }
+
 
                 info?.Invoke(
                     $"Sauvegarde du dictionnaire des mots détectés",
@@ -739,8 +555,7 @@ namespace fr.avh.braille.addin
                 );
                 this.Save();
                 info?.Invoke($"Document prêt pour analyse", new Tuple<int, int>(9, baseStepNumber));
-                TexteEnMemoire = DocumentMainRange;
-                SelectedRange.Select();
+                ChargerTexteEnMemoire();
             }
             else
             {
@@ -748,67 +563,240 @@ namespace fr.avh.braille.addin
             }
         }
 
-        public void ReanalyserDocument()
+
+        public async Task<List<int>> IndicesOccurencesHorsLexique()
+        {
+            List<Task<bool>> tasksHorsLexique = new List<Task<bool>>();
+            foreach(var occurence in DonneesTraitement.Occurences) {
+                tasksHorsLexique.Add(
+                    Task.Run(() => !LexiqueFrance.EstFrancaisAbregeable(occurence))
+                );
+            }
+            
+            return await Task.WhenAll(tasksHorsLexique).ContinueWith(t =>
+            {
+                List<int> indices = new List<int>();
+                bool[] estHorsLexique = t.Result;
+                for (int i = 0; i < estHorsLexique.Length; i++) {
+                    if (estHorsLexique[i]) {
+                        indices.Add(i);
+                    }
+                }
+                return indices;
+            });
+        }
+
+        /// <summary>
+        /// Analyse du texte en mémoire
+        /// </summary>
+        public void AnalyseDuTexteEnMemoire()
+        {
+            try {
+                string texteAnalyser = string.Copy(TexteEnMemoire);
+                var analyse = Abreviation.AnalyserTexte(texteAnalyser, info).OrderBy(i => i.Key).Select(i => i.Value).ToList();
+                info?.Invoke(
+                    $"Recherche puis protection des mots contenant des chiffres..."
+                );
+                int offset = 0;
+                List<int> debutBlocsIntegral = new List<int>();
+                List<int> finBlocsIntegral = new List<int>();
+                for (int i = 0; i < analyse.Count; i++) {
+                    if (!analyse[i].EstDejaProteger
+                        && (analyse[i].ContientDesChiffres)
+                    ) {
+                        Range selection = _document.Range(offset + analyse[i].Index, offset + analyse[i].Index + analyse[i].Mot.Length);
+                        Range test = Proteger(selection);
+                        offset += DictionnaireDeTravail.PROTECTION_CODE.Length;
+                        //offset += test.Words.Count > 1 
+                        //    ? DictionnaireDeTravail.PROTECTION_CODE_G1.Length + DictionnaireDeTravail.PROTECTION_CODE_G2.Length
+                        //    : DictionnaireDeTravail.PROTECTION_CODE.Length;
+                    } else if (analyse[i].EstAbregeable
+                        && (
+                            (analyse[i].EstFrançaisAbregeable && analyse[i].ContientDesMajuscules)
+                            || analyse[i].EstAmbigu
+                            || !analyse[i].EstFrançaisAbregeable
+                        )
+                    ) {
+                        // Reprise des contextes
+                        string foundWord = analyse[i].Mot;
+                        int indexInAnalysis = analyse[i].Index;
+
+                        bool isAlreadyProtected = analyse[i].EstDejaProteger || (analyse[i].CommenceUnBlocIntegral && analyse[i].TermineUnBlocIntegral);
+
+                        if (analyse[i].CommenceUnBlocIntegral) {
+                            debutBlocsIntegral.Add(offset + indexInAnalysis);
+                        }
+                        if (analyse[i].TermineUnBlocIntegral) {
+                            finBlocsIntegral.Add(offset + indexInAnalysis + foundWord.Length);
+                        }
+
+                        // Récupération du contexte autour de l'occurence
+                        int indexBefore = Math.Max(0, indexInAnalysis - 50);
+                        int indexAfter = Math.Min(
+                            texteAnalyser.Length - 1,
+                            indexInAnalysis + foundWord.Length + 50
+                        );
+                        string contextBefore = texteAnalyser.Substring(
+                            indexBefore,
+                            indexInAnalysis - indexBefore
+                        );
+                        string contextAfter = "";
+
+                        contextAfter = texteAnalyser.Substring(
+                            indexInAnalysis + foundWord.Length,
+                            indexAfter - foundWord.Length - indexInAnalysis
+                        );
+                        // On ajoute cette occurence de mot si elle n'est pas déjà dans le dictionnaire de traitement
+                        if (
+                            !(
+                                DonneesTraitement.CarteMotOccurences.ContainsKey(
+                                    foundWord.ToLower().Trim()
+                                )
+                                && DonneesTraitement.CarteMotOccurences[
+                                    foundWord.ToLower().Trim()
+                                ].FindIndex(
+                                    occurence =>
+                                        DonneesTraitement.PositionsOccurences[occurence] == (offset + indexInAnalysis)
+                                ) >= 0
+                            )
+                        ) {
+                            DonneesTraitement.AjouterOccurence(
+                                foundWord,
+                                isAlreadyProtected ? Statut.PROTEGE : Statut.INCONNU,
+                                contextBefore,
+                                contextAfter,
+                                offset + indexInAnalysis,
+                                isAlreadyProtected
+                            );
+                        }
+                    }
+                    info?.Invoke(
+                        $"",
+                        new Tuple<int, int>(i + 1, analyse.Count)
+                    );
+                }
+                ChargerTexteEnMemoire();
+                DonneesTraitement.ReorderOccurences();
+                DonneesTraitement.CalculCartographieMots();
+                texteAnalyser = string.Copy(TexteEnMemoire);
+                var debutBlocs = Regex.Matches(texteAnalyser, $"\\[\\[\\*g1\\*\\]\\]");
+                if (debutBlocs.Count > 0) {
+                    foreach (Match res in debutBlocs) {
+                        DonneesTraitement.DebutsBlocsIntegrals.Add(res.Index + DictionnaireDeTravail.PROTECTION_CODE_G1.Length);
+                    }
+                }
+                var finBlocs = Regex.Matches(texteAnalyser, $"\\[\\[\\*g2\\*\\]\\]");
+                if (finBlocs.Count > 0) {
+                    foreach (Match res in finBlocs) {
+                        DonneesTraitement.FinsBlocsIntegrals.Add(res.Index);
+                    }
+                }
+            } catch(Exception e) {
+                error?.Invoke(e);
+            }
+            
+        }
+
+
+        /// <summary>
+        /// Applique les décisions sur tout ou partie des occurences détectés
+        /// </summary>
+        /// <param name="surToutesOccurence">Si vrai, reapplique les décisions sur touts </param>
+        /// <param name="start">Occurence a partir de laquelle appliquer les décision (incluse)</param>
+        /// <param name="end">Derniere occurence a traité (incluse), -1 = pas de limite</param>
+        public void AppliquerDecisions(bool surToutesOccurence = false, int start = 0, int end = -1)
+        {
+            int _start = Math.Min(DonneesTraitement.Occurences.Count - 1, Math.Max(0, start));
+            int _end = end < 0 ? DonneesTraitement.Occurences.Count - 1 : Math.Min(DonneesTraitement.Occurences.Count - 1, Math.Max(0, start));
+            if(_start > _end) {
+                int t = _end;
+                _end = _start;
+                _start = t;
+            }
+            info?.Invoke("", Tuple.Create(0, _end - _start));
+            for (int i = _start; i <= _end; i++) {
+                string wordKey = DonneesTraitement.Occurences[i].ToLower();
+                Statut selected = DonneesTraitement.StatutsOccurences[i];
+                // N'appliquer les décisions
+                if (surToutesOccurence || !DonneesTraitement.StatutsAppliquer[i]) {
+                    switch (selected) {
+                        case Statut.INCONNU:
+                            if (DonneesTraitement.CarteMotStatut.ContainsKey(wordKey)
+                                && DonneesTraitement.CarteMotStatut[wordKey] != Statut.INCONNU
+                                && DonneesTraitement.StatutsAppliquer[i] == false
+                            ) {
+                                AppliquerStatutSurOccurence(i, DonneesTraitement.CarteMotStatut[wordKey]);
+                            }
+                            break;
+                        default:
+                            AppliquerStatutSurOccurence(i, selected);
+                            break;
+                    }
+                }
+                info?.Invoke("", Tuple.Create(_start + 1, _end - _start));
+            }
+        }
+
+        /// <summary>
+        /// FIXME : Cette fonction pose probleme en relance asynchrone (freeze de l'ui
+        /// </summary>
+        public void ReanalyserDocumentSiModification()
         {
             if (TexteEnMemoire != DocumentMainRange)
             {
                 info?.Invoke(
                     $"Modification de contenu détecter : réanalyse du document ..."
                 );
-                DictionnaireDeTravail actuel = WorkingDictionnary.Clone();
-                WorkingDictionnary = new DictionnaireDeTravail(
-                    Path.GetFileNameWithoutExtension(WorkingDictionnaryPath) + ".bdic"
+                DictionnaireDeTravail actuel = DonneesTraitement.Clone();
+                DonneesTraitement = new DictionnaireDeTravail(
+                    Path.GetFileNameWithoutExtension(WorkingDictionnaryPath)
                 );
-                this.TexteEnMemoire = DocumentMainRange;
-                // Reajouter tous les mots au traitement
-                info?.Invoke(
-                    $"Recherche des occurences des {actuel.CarteMotOccurences.Keys.Count} mots précédement identifiés ..."
-                );
-                AjouterListeMotsAuTraitement(actuel.CarteMotOccurences.Keys.ToList());
-                List<string> motsAControler = new List<string>();
+
+                ChargerTexteEnMemoire();
+                
+                AnalyseDuTexteEnMemoire();
+                
                 info?.Invoke($"Rechargement des décisions ...");
-                for (int i = 0; i < actuel.CarteMotOccurences.Keys.Count; i++)
-                {
-                    string item = actuel.CarteMotOccurences.Keys.ElementAt(i);
+                List<string> motsAControler = new List<string>();
+                for (int i = 0; i < actuel.CarteMotOccurences.Keys.Count; i++) {
                     info?.Invoke("", new Tuple<int, int>(i, actuel.CarteMotOccurences.Keys.Count));
+                    string item = actuel.CarteMotOccurences.Keys.ElementAt(i);
+                    // Mot ajouté manuellement
+                    if (!DonneesTraitement.CarteMotOccurences.ContainsKey(item)) {
+                        info?.Invoke($"Reprise du mot ajouté manuellement {item} ...");
+                        AjouterMotAuTraitement(item);
+                    }
                     // Appliquer le statut de l'occurence précédente a la nouvelle occurence
                     for (
                         int indexInMap = 0;
                         indexInMap < actuel.CarteMotOccurences[item].Count;
                         indexInMap++
-                    )
-                    {
+                    ) {
                         int occurence = actuel.CarteMotOccurences[item][indexInMap];
-                        if (indexInMap < WorkingDictionnary.CarteMotOccurences[item].Count)
-                        {
-                            int newOccurence = WorkingDictionnary.CarteMotOccurences[item][
+                        if (indexInMap < DonneesTraitement.CarteMotOccurences[item].Count) {
+                            int newOccurence = DonneesTraitement.CarteMotOccurences[item][
                                 indexInMap
                             ];
                             if (
                                 actuel.Occurences[occurence]
-                                != WorkingDictionnary.Occurences[newOccurence]
-                            )
-                            {
+                                != DonneesTraitement.Occurences[newOccurence]
+                            ) {
                                 info?.Invoke(
                                     $"Attention !! l'occurence {indexInMap + 1} du mot {item} a changer d'écriture\r\n"
-                                        + $"(avant: {actuel.Occurences[occurence]} - apres {WorkingDictionnary.Occurences[newOccurence]})"
+                                        + $"(avant: {actuel.Occurences[occurence]} - apres {DonneesTraitement.Occurences[newOccurence]})"
                                 );
-                                if (!motsAControler.Contains(item))
-                                {
+                                if (!motsAControler.Contains(item)) {
                                     motsAControler.Add(item);
                                 }
                             }
-                            WorkingDictionnary.StatutsOccurences[
-                                WorkingDictionnary.CarteMotOccurences[item][indexInMap]
+                            DonneesTraitement.StatutsOccurences[
+                                DonneesTraitement.CarteMotOccurences[item][indexInMap]
                             ] = actuel.StatutsOccurences[occurence];
-                        }
-                        else
-                        {
+                        } else {
                             info?.Invoke(
                                 $"Attention !! le nombre d'occurence du mot {item} a changé"
                             );
-                            if (!motsAControler.Contains(item))
-                            {
+                            if (!motsAControler.Contains(item)) {
                                 motsAControler.Add(item);
                             }
                             break;
@@ -816,14 +804,66 @@ namespace fr.avh.braille.addin
                     }
                 }
                 this.Save();
-                if (motsAControler.Count > 0)
-                {
+                if (motsAControler.Count > 0) {
                     MessageBox.Show(
                         $"Attention, les mots suivants doivent êtres recontrolés : \r\n"
                             + string.Join(", ", motsAControler),
                         "Mots à recontroler",
                         MessageBoxButton.OK
                     );
+                }
+            }
+        }
+
+        public void ImporterUnDictionnaire(string filePath)
+        {
+            if (!File.Exists(filePath)) {
+                MessageBox.Show(
+                    "Le fichier sélectionné n'existe pas : " + filePath,
+                    "Fichier introuvable",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
+                return;
+            }
+            DictionnaireDeTravail importer = null;
+            try {
+                switch (Path.GetExtension(filePath).ToLower()) {
+                    case ".json":
+                        importer = DictionnaireDeTravail.FromDictionnaryFileJSON(filePath).Result;
+                        break;
+                    case ".bdic":
+                        importer = DictionnaireDeTravail.FromDictionnaryFileBDIC(filePath).Result;
+                        break;
+                    case ".ddic":
+                        importer = DictionnaireDeTravail.FromDictionnaryFileDDIC(filePath).Result;
+                        break;
+                    default:
+                        throw new NotSupportedException("Format de fichier non supporté : " + Path.GetExtension(filePath));
+                }
+            }
+            catch (Exception ex) {
+                MessageBox.Show(
+                    "Impossible de charger ce dictionnaire :\r\n" + ex.Message,
+                    "Erreur de chargement",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
+                return;
+            }
+            if (importer != null) {
+                DonneesTraitement.RechargerDecisionDe(importer);
+                var res = MessageBox.Show("Dictionnaire chargé avec succès : " + DonneesTraitement.NomDictionnaire +
+                    "\r\nSouhaitez-vous appliquer les décisions sur le document immédiatement ?", "Chargement réussi", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (res == MessageBoxResult.Yes) {
+                    try {
+                        info?.Invoke("Application des décisions sur le document ...");  
+                        AppliquerDecisions(false);
+                        MessageBox.Show("Décisions appliquées avec succès.", "Application réussie", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex) {
+                        //MessageBox.Show("Erreur lors de l'application des décisions :\r\n" + ex.Message, "Erreur d'application", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
         }
@@ -943,12 +983,6 @@ namespace fr.avh.braille.addin
                     }
                 }
                 return motsARechercher;
-                //foreach(string mot in motsARechercher)
-                //{
-                //    AjouterMotAuTraitement(mot, refreshDictionnary: false);
-                //}
-                //WorkingDictionnary.ReorderOccurences();
-                //WorkingDictionnary.ComputeWordMap();
             }
             catch (Exception e)
             {
@@ -986,7 +1020,7 @@ namespace fr.avh.braille.addin
             // Pour un mot donné, on recherche toute ses occurence dans le texte d'origine qu'on a garder en cache
             // NP 2024/11/20 : remplacement du word boundary par la recherche de caracteres non alphanumériques et des tirets (pour éviter les mots composés)
             //new Regex($"(^|[^{ALPHANUM}-])(\\[\\[\\*i\\*\\]\\])?({word})([^{ALPHANUM}-]|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            Regex toLook = SearchWord(word, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            Regex toLook = Abreviation.SearchWord(word, RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             MatchCollection check = toLook.Matches(TexteEnMemoire);
             if (check.Count > 0)
@@ -1018,49 +1052,44 @@ namespace fr.avh.braille.addin
                     // On ajoute cette occurence de mot si elle n'est pas déjà dans le dictionnaire de traitement
                     if (
                         !(
-                            WorkingDictionnary.CarteMotOccurences.ContainsKey(word)
-                            && WorkingDictionnary.CarteMotOccurences[word].FindIndex(
+                            DonneesTraitement.CarteMotOccurences.ContainsKey(word)
+                            && DonneesTraitement.CarteMotOccurences[word].FindIndex(
                                 occurence =>
-                                    WorkingDictionnary.PositionsOccurences[occurence] == indexInText
+                                    DonneesTraitement.PositionsOccurences[occurence] == indexInText
                             ) >= 0
                         )
                     )
                     {
-                        WorkingDictionnary.Add(
+                        DonneesTraitement.AjouterOccurence(
                             foundWord,
                             isAlreadyProtected ? Statut.PROTEGE : Statut.INCONNU,
                             contextBefore,
                             contextAfter,
-                            indexInText
+                            indexInText,
+                            isAlreadyProtected
                         );
-                        if (isAlreadyProtected)
-                        {
-                            WorkingDictionnary.StatutsAppliquer[
-                                WorkingDictionnary.Occurences.Count - 1
-                            ] = true;
-                        }
                     }
                 }
                 if (refreshDictionnary)
                 {
-                    WorkingDictionnary.ReorderOccurences();
-                    WorkingDictionnary.ComputeWordMap();
+                    DonneesTraitement.ReorderOccurences();
+                    DonneesTraitement.CalculCartographieMots();
                 }
                 if (statut != Statut.INCONNU)
                 {
                     if (selectedOccurenceIndexInMap >= 0)
                     {
                         // on a sélectionner une occurence en particulier
-                        WorkingDictionnary.StatutsOccurences[
-                            WorkingDictionnary.CarteMotOccurences[word][selectedOccurenceIndexInMap]
+                        DonneesTraitement.StatutsOccurences[
+                            DonneesTraitement.CarteMotOccurences[word][selectedOccurenceIndexInMap]
                         ] = statut;
                     }
                     else
                     {
                         // on a pas sélectionner d'occurence, on applique a toutes les occurences
-                        foreach (var index in WorkingDictionnary.CarteMotOccurences[word])
+                        foreach (var index in DonneesTraitement.CarteMotOccurences[word])
                         {
-                            WorkingDictionnary.StatutsOccurences[index] = statut;
+                            DonneesTraitement.StatutsOccurences[index] = statut;
                         }
                     }
                 }
@@ -1078,7 +1107,8 @@ namespace fr.avh.braille.addin
         /// <param name="statut"></param>
         /// <param name="refreshDictionnary"></param>
         /// <param name="alerteSiNonTrouver"></param>
-        public void AjouterListeMotsAuTraitement(
+        [Obsolete("Peut provoquer une erreur StackOverFlow sur un nombre de mot trop importants")]
+        public void AjouterListeMotsAuTraitementOld(
             List<string> mots,
             Statut statut = Statut.INCONNU,
             bool refreshDictionnary = true,
@@ -1089,8 +1119,7 @@ namespace fr.avh.braille.addin
                 return;
 
             string word = mots[0].Trim().ToLower();
-            for (int i = 1; i < mots.Count; i++)
-            {
+            for (int i = 1; i < mots.Count; i++) {
                 word += "|" + mots[i].Trim().ToLower();
             }
             Regex toLook = SearchWord(
@@ -1098,8 +1127,7 @@ namespace fr.avh.braille.addin
                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline
             );
             MatchCollection check = toLook.Matches(TexteEnMemoire);
-            if (check.Count > 0)
-            {
+            if (check.Count > 0) {
                 foreach (Match item in check)
                 {
                     bool isAlreadyProtected = item.Groups[1].Success;
@@ -1124,65 +1152,198 @@ namespace fr.avh.braille.addin
                     // On ajoute cette occurence de mot si elle n'est pas déjà dans le dictionnaire de traitement
                     if (
                         !(
-                            WorkingDictionnary.CarteMotOccurences.ContainsKey(
+                            DonneesTraitement.CarteMotOccurences.ContainsKey(
                                 foundWord.ToLower().Trim()
                             )
-                            && WorkingDictionnary.CarteMotOccurences[
+                            && DonneesTraitement.CarteMotOccurences[
                                 foundWord.ToLower().Trim()
                             ].FindIndex(
                                 occurence =>
-                                    WorkingDictionnary.PositionsOccurences[occurence] == indexInText
+                                    DonneesTraitement.PositionsOccurences[occurence] == indexInText
                             ) >= 0
                         )
-                    )
-                    {
-                        WorkingDictionnary.Add(
+                    ) {
+                        DonneesTraitement.AjouterOccurence(
                             foundWord,
                             isAlreadyProtected ? Statut.PROTEGE : Statut.INCONNU,
                             contextBefore,
                             contextAfter,
                             indexInText
                         );
-                        if (isAlreadyProtected)
-                        {
-                            WorkingDictionnary.StatutsAppliquer[
-                                WorkingDictionnary.Occurences.Count - 1
+                        if (isAlreadyProtected) {
+                            DonneesTraitement.StatutsAppliquer[
+                                DonneesTraitement.Occurences.Count - 1
                             ] = true;
                         }
                     }
                 }
-                if (refreshDictionnary)
-                {
-                    WorkingDictionnary.ReorderOccurences();
-                    WorkingDictionnary.ComputeWordMap();
-                }
-                if (statut != Statut.INCONNU)
-                {
-                    foreach (var index in WorkingDictionnary.CarteMotOccurences[word])
-                    {
-                        WorkingDictionnary.StatutsOccurences[index] = statut;
-                    }
+                
+            }
+            info?.Invoke($"Reconstruction de la cartographie...");
+            if (refreshDictionnary) {
+                DonneesTraitement.ReorderOccurences();
+                DonneesTraitement.CalculCartographieMots();
+            }
+            if (statut != Statut.INCONNU) {
+                foreach (var index in DonneesTraitement.CarteMotOccurences[word]) {
+                    DonneesTraitement.StatutsOccurences[index] = statut;
                 }
             }
+            
             else if (alerteSiNonTrouver)
             {
                 info?.Invoke($"Attention : {word} non retrouvé");
             }
         }
 
+        /// <summary>
+        ///
+        /// </summary>
+        /// <param name="mots"></param>
+        /// <param name="statut"></param>
+        /// <param name="refreshDictionnary"></param>
+        /// <param name="alerteSiNonTrouver"></param>
+        public void AjouterListeMotsAuTraitement(
+            List<string> mots,
+            Statut statut = Statut.INCONNU,
+            bool refreshDictionnary = true,
+            bool alerteSiNonTrouver = false
+        )
+        {
+            if (mots.Count == 0)
+                return;
+
+            // Suppression de tous les hyperliens créer parfois automatiquement par word ...
+            foreach (MSWord.Hyperlink link in _document.Hyperlinks) {
+                link.Delete();
+            }
+            // Loop through fields in reverse to safely delete
+            for (int i = _document.Fields.Count; i >= 1; i--) {
+                MSWord.Field field = _document.Fields[i];
+                if (field.Type == MSWord.WdFieldType.wdFieldHyperlink) {
+                    field.Unlink(); // Replaces hyperlink with its display text
+                }
+            }
+
+            List<Task<List<Tuple<string, Statut, string, string, int>>>> foundResults = new List<Task<List<Tuple<string, Statut, string, string, int>>>>();
+
+            foreach (var mot in mots) {
+                foundResults.Add(Task.Run(() =>
+                {
+                    string word = mot.Trim().ToLower();
+                    Regex toLook = SearchWord(
+                        word,
+                            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline
+                        );
+                    MatchCollection check = toLook.Matches(TexteEnMemoire);
+                    List<Tuple<string, Statut, string, string, int>> temp = new List<Tuple<string, Statut, string, string, int>>();
+
+                    if (check.Count > 0) {
+                        foreach (Match item in check) {
+                            bool isAlreadyProtected = item.Groups[1].Success;
+                            string foundWord = item.Groups[2].Value;
+                            int indexInText = item.Groups[2].Index;
+                            // Récupération du contexte autour de l'occurence
+                            int indexBefore = Math.Max(0, indexInText - 50);
+                            int indexAfter = Math.Min(
+                                TexteEnMemoire.Length - 1,
+                                indexInText + foundWord.Length + 50
+                            );
+                            string contextBefore = TexteEnMemoire.Substring(
+                                indexBefore,
+                                indexInText - indexBefore
+                            );
+                            string contextAfter = "";
+
+                            contextAfter = TexteEnMemoire.Substring(
+                                indexInText + foundWord.Length,
+                                indexAfter - foundWord.Length - indexInText
+                            );
+                            temp.Add(
+                                new Tuple<string, Statut, string, string, int>(foundWord,
+                                    isAlreadyProtected ? Statut.PROTEGE : Statut.INCONNU,
+                                    contextBefore,
+                                    contextAfter,
+                                    indexInText
+                                )
+                            );
+                        }
+                    }
+                    return temp;
+                }));
+                //string word = mots[0].Trim().ToLower();
+                //for (int i = 1; i < mots.Count; i++) {
+                //    word += "|" + mots[i].Trim().ToLower();
+                //}
+
+            }
+            List<Tuple<string, Statut, string, string, int>>[] results = null;
+            try {
+                results = Task.WhenAll(foundResults).Result;
+            }
+            catch (AggregateException ae) {
+                error?.Invoke(
+                    new Exception($"Erreur lors de la recherche des mots dans le document", ae)
+                );
+                return;
+            }
+            foreach (var res in results) {
+                foreach (var res2 in res) {
+                    // On ajoute cette occurence de mot si elle n'est pas déjà dans le dictionnaire de traitement
+                    if (
+                        !(
+                            DonneesTraitement.CarteMotOccurences.ContainsKey(
+                                res2.Item1.ToLower().Trim()
+                            )
+                            && DonneesTraitement.CarteMotOccurences[
+                                res2.Item1.ToLower().Trim()
+                            ].FindIndex(
+                                occurence =>
+                                    DonneesTraitement.PositionsOccurences[occurence] == res2.Item5
+                            ) >= 0
+                        )
+                    ) {
+                        DonneesTraitement.AjouterOccurence(
+                            res2.Item1,
+                            res2.Item2,
+                            res2.Item3,
+                            res2.Item4,
+                            res2.Item5
+                        );
+                        if (res2.Item2 == Statut.PROTEGE) {
+                            DonneesTraitement.StatutsAppliquer[
+                                DonneesTraitement.Occurences.Count - 1
+                            ] = true;
+                        }
+                    }
+
+                }
+            }
+            info?.Invoke($"Reconstruction de la cartographie après recherche de {mots.Count} mots ...");
+            if (refreshDictionnary) {
+                DonneesTraitement.ReorderOccurences();
+                DonneesTraitement.CalculCartographieMots();
+            }
+            foreach(var word in mots) {
+                var _word = word.Trim().ToLower();
+                if (statut != Statut.INCONNU && DonneesTraitement.CarteMotOccurences.ContainsKey(word)) {
+                    foreach (var index in DonneesTraitement.CarteMotOccurences[word]) {
+                        DonneesTraitement.StatutsOccurences[index] = statut;
+                    }
+                } else if (alerteSiNonTrouver && !DonneesTraitement.CarteMotOccurences.ContainsKey(word)) {
+                    info?.Invoke($"Attention : {word} non retrouvé");
+                }
+            }
+            info?.Invoke($"Reconstruction de la cartographie finis");
+
+
+        }
+
         public void Save()
         {
-            this.WorkingDictionnary.Save(
+            this.DonneesTraitement.DernierMotSelectionne = MotSelectionne;
+            this.DonneesTraitement.SaveJSON(
                 new DirectoryInfo(Path.GetDirectoryName(WorkingDictionnaryPath))
-            );
-            if (File.Exists(ResumePath))
-            {
-                File.Delete(ResumePath);
-            }
-            // Fichier de reprise de traitement
-            File.WriteAllLines(
-                ResumePath,
-                new string[] { SelectedWord, EstTerminer() ? "-- terminé" : "" }
             );
         }
 
@@ -1193,127 +1354,31 @@ namespace fr.avh.braille.addin
 
         public void AppliquerStatutsSurDocument(OnProtectorProgress callback = null)
         {
-            this.ReanalyserDocument();
+            this.ReanalyserDocumentSiModification();
 
             callback?.Invoke(
                 $"Application des statuts sur les mots du documents...",
-                new Tuple<int, int>(0, WorkingDictionnary.Occurences.Count)
+                new Tuple<int, int>(0, DonneesTraitement.Occurences.Count)
             );
-            for (int i = 0; i < WorkingDictionnary.Occurences.Count; i++)
+            for (int i = 0; i < DonneesTraitement.Occurences.Count; i++)
             {
-                AppliquerStatutSurOccurence(i, WorkingDictionnary.StatutsOccurences[i]);
+                AppliquerStatutSurOccurence(i, DonneesTraitement.StatutsOccurences[i]);
                 callback?.Invoke(
-                    progress: new Tuple<int, int>(i + 1, WorkingDictionnary.Occurences.Count)
+                    progress: new Tuple<int, int>(i + 1, DonneesTraitement.Occurences.Count)
                 );
             }
             //this.AnalyserDocument();
         }
 
-        public void ReinitialiserDocument(OnProtectorProgress callback = null)
-        {
-            info?.Invoke($"Déprotection des mots contenants des chiffres ...");
-            MSWord.Range protectionRange = _document.StoryRanges[WdStoryType.wdMainTextStory];
-            var finder = protectionRange.Find;
-            int p = 0;
-            foreach (string item in occurencesToProtect)
-            {
-                p++;
-                callback?.Invoke(
-                    $"Protection automatique des mots contenants des chiffres ...",
-                    new Tuple<int, int>(p, occurencesToProtect.Count)
-                );
-                finder.ClearFormatting();
-                finder.Text = item;
-                finder.Forward = true;
-                finder.MatchCase = true;
-                if (finder.Execute())
-                {
-                    Abreger(protectionRange);
-                }
-            }
-
-            info?.Invoke($"Application de tous les statuts sur les mots du documents...");
-            MSWord.Range docRange = _document.StoryRanges[WdStoryType.wdMainTextStory];
-            for (int i = 0; i < WorkingDictionnary.Occurences.Count; i++)
-            {
-                callback?.Invoke(
-                    $"Application de tous les statuts sur les mots du documents...",
-                    new Tuple<int, int>(i + 1, WorkingDictionnary.Occurences.Count)
-                );
-                string searchedWord = WorkingDictionnary.Occurences[i];
-                string contextAfter = WorkingDictionnary.ContextesApresOccurences[i];
-                string contextBefore = WorkingDictionnary.ContextesAvantOccurences[i];
-                Statut toApply = WorkingDictionnary.StatutsOccurences[i];
-                docRange = _document.Range(
-                    docRange.Start,
-                    _document.StoryRanges[WdStoryType.wdMainTextStory].End
-                );
-                finder = docRange.Find;
-                finder.ClearFormatting();
-                // Pour eviter les mots composés
-                string before = (contextBefore.Length > 0 ? "[!-]" : "");
-                string after = contextAfter;
-                if (after.IndexOf("\r") >= 0)
-                {
-                    after = after.Substring(0, after.IndexOf("\r"));
-                }
-                finder.Text = $"{before}{searchedWord}>{after}";
-                finder.Forward = true;
-                finder.MatchCase = true;
-                finder.MatchWildcards = true;
-                bool found = false;
-                try
-                {
-                    found = finder.Execute();
-                }
-                catch
-                {
-                    found = false;
-                }
-                if (found)
-                {
-                    docRange = _document.Range(
-                        docRange.Start + (before.Length > 0 ? 1 : 0),
-                        docRange.End - after.Length
-                    );
-                }
-                else
-                {
-                    // Fallback : redo the search without whole word but using the next context
-                    finder.ClearFormatting();
-                    finder.Text = $"{searchedWord}{after}";
-                    finder.Forward = true;
-                    finder.MatchCase = true;
-                    finder.MatchWholeWord = false;
-                    if (!finder.Execute())
-                    {
-                        throw new Exception(
-                            $"L'occurence numéro {i} ({searchedWord}) n'a pas pu être retrouvé dans le texte"
-                        );
-                    }
-                    else
-                    {
-                        docRange = _document.Range(docRange.Start, docRange.End - after.Length);
-                    }
-                }
-                docRange.Select();
-                SelectedRange = docRange;
-                SelectedOccurence = i;
-                Abreger(SelectedRange);
-            }
-            // Sauvegarde du document
-            _document.Save();
-            this.ReanalyserDocument();
-        }
 
         #region Actions
 
         public void ProtegerOccurence()
         {
-            var occurrences = WorkingDictionnary.CarteMotOccurences[SelectedWord];
+            var occurrences = DonneesTraitement.CarteMotOccurences[MotSelectionne];
             foreach (var index in occurrences)
             {
-                WorkingDictionnary.StatutsOccurences[index] = Statut.PROTEGE;
+                DonneesTraitement.StatutsOccurences[index] = Statut.PROTEGE;
             }
             SelectedRange = Proteger(SelectedRange);
             /*WorkingDictionnary.StatutsOccurences[SelectedOccurence] = Statut.PROTEGE;
@@ -1322,14 +1387,270 @@ namespace fr.avh.braille.addin
 
         public void AbregerOccurence()
         {
-            var occurrences = WorkingDictionnary.CarteMotOccurences[SelectedWord];
+            var occurrences = DonneesTraitement.CarteMotOccurences[MotSelectionne];
             foreach (var index in occurrences)
             {
-                WorkingDictionnary.StatutsOccurences[index] = Statut.ABREGE;
+                DonneesTraitement.StatutsOccurences[index] = Statut.ABREGE;
             }
             SelectedRange = Abreger(SelectedRange);
             /*WorkingDictionnary.StatutsOccurences[SelectedOccurence] = Statut.ABREGE;
             SelectedRange = Proteger(SelectedRange);*/
+        }
+
+
+        /// <summary>
+        /// Insère des codes G1 et G2 autour d'un bloc de texte dans un document, si ce bloc n'est pas déjà protégé.
+        /// </summary>
+        /// <param name="current">Documment Word</param>
+        /// <param name="wordRange">Sélection dans le document word</param>
+        /// <returns>La sélection protégée (sans les codes s'ils ont été rajoutés)</returns>
+        public static MSWord.Range ProtegerBloc(MSWord.Document current, MSWord.Range wordRange)
+        {
+            // Note sur le code commenter :
+            // Ne marche pas - texte parasite a cause des code duxburry qui sont pris comme des mots
+            //if (wordRange.Words.Count == 0) {
+            //    // Si la sélection est vide, on ne fait rien
+            //    return wordRange;
+            //}
+            //// Un seul mot dans la sélection, on le resélectionne
+            //if (wordRange.Words.Count == 1) {
+            //    wordRange = wordRange.Words.First;
+            //} else {
+            //    wordRange = current.Range(
+            //        wordRange.Words.First.Start,
+            //        wordRange.Words.Last.End
+            //    );
+            //}
+            //wordRange.Select();
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0)
+            {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = current.Range(
+                    wordRange.Start + trimmedCount,
+                    wordRange.End
+                );
+                //wordRange.Select();
+            }
+
+            string textBefore = current.Range(0, wordRange.Start).Text;
+
+            if (!EstProtegerBloc(textBefore, wordRange.Text))
+            {
+                wordRange.InsertBefore(DictionnaireDeTravail.PROTECTION_CODE_G1);
+                wordRange.InsertAfter(DictionnaireDeTravail.PROTECTION_CODE_G2);
+                wordRange = current.Range(
+                    wordRange.Start + DictionnaireDeTravail.PROTECTION_CODE_G1.Length,
+                    wordRange.End - DictionnaireDeTravail.PROTECTION_CODE_G2.Length
+                );
+                //wordRange.Select();
+            }
+            return wordRange;
+        }
+
+        /// <summary>
+        /// Protéger un bloc de mots dans le document
+        /// </summary>
+        /// <param name="wordRange"></param>
+        public void ProtegerBloc(MSWord.Range wordRange)
+        {
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = _document.Range(wordRange.Start + trimmedCount, wordRange.End);
+                //wordRange.Select();
+            }
+
+            string trimmedEnd = wordRange.Text.TrimEnd();
+            if (trimmedEnd.EndsWith("\r")) trimmedEnd = trimmedEnd.Substring(0, trimmedEnd.Length - 1);
+            trimmedCount = wordRange.Text.Length - trimmedEnd.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = _document.Range(wordRange.Start, wordRange.End - trimmedCount);
+                //wordRange.Select();
+            }
+
+            if (wordRange.Text.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+                wordRange = _document.Range(wordRange.Start + DictionnaireDeTravail.PROTECTION_CODE_G1.Length, wordRange.End);
+            }
+            if (wordRange.Text.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)) {
+                wordRange = _document.Range(wordRange.Start, wordRange.End - +DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
+            }
+
+            int indexDebut = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.Start && wordRange.Start <= t.Item2);
+            int indexFin = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.End && wordRange.End <= t.Item2);
+
+            if(indexDebut < 0 && indexFin < 0) {
+                // Si le bloc n'est pas dans la liste des blocs intégral, on protège la zone
+                 // passer en ignorer toutes les occurences situés dans l'intervale
+                wordRange = ProtegerBloc(_document, wordRange);
+                DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= wordRange.Start && DonneesTraitement.PositionsOccurences[i] <= wordRange.End) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+                
+                return;
+            } else if(indexDebut == indexFin) {
+                    // Deja protégé, on ne fait rien
+                return;
+            } else if(indexDebut >= 0 && indexDebut < indexFin) {
+                // protection sur plusieurs bloc : fusion des blocs
+                int blocStart = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int blockEnd = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
+                int newEnd = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
+                // Supprimer les blocs y compris les bloc englobant
+                for (int i = indexFin; i >= indexDebut; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                    DonneesTraitement.SupprimerBlocIntegral(i);
+                }
+                // Creer le nouveau block
+                ProtegerBloc(_document, _document.Range(blocStart, newEnd));
+                DonneesTraitement.AjouterBlocIntegral(blocStart, newEnd, true);
+                //Passer en ignorer toutes les occurence dans le nouveau block
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= blocStart && DonneesTraitement.PositionsOccurences[i] <= newEnd) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+
+            } else if (indexDebut >= 0 && indexFin < 0) {
+                // Extension d'un bloc existant vers sa fin
+                int blocStart = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int blockEnd = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
+                int newEnd = wordRange.End;
+                // Supprimer les bloc intermédiaire
+                for (int i = DonneesTraitement.ListeBlocsIntegral.Count - 1; i >= indexDebut; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    if (bloc.Item1 >= blocStart && bloc.Item2 <= newEnd) {
+                        // On trouve un bloc qui commence après le début du bloc actuel et avant la fin du nouveau bloc
+                        AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                        DonneesTraitement.SupprimerBlocIntegral(i);
+                    }
+                }
+                wordRange = ProtegerBloc(_document, _document.Range(blocStart, newEnd));
+                DonneesTraitement.AjouterBlocIntegral(blocStart, newEnd, true);
+                // Passer en ignorer toutes les occurence dans le nouveau block
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= wordRange.Start && DonneesTraitement.PositionsOccurences[i] <= wordRange.End) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+
+            } else if (indexDebut < 0 && indexFin >= 0) {
+                // Extension d'un bloc existant vers son début
+                int blocStart = DonneesTraitement.ListeBlocsIntegral[indexFin].Item1;
+                int blockEnd = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
+                int newStart = wordRange.Start;
+                
+                // Supprimer les bloc
+                for (int i = indexFin; i >= 0; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    if (bloc.Item1 >= newStart && bloc.Item2 < blockEnd) {
+                        // On trouve un bloc qui commence après le début du nouveaux bloc actuel et avant la fin du bloc actuel
+                        AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                        DonneesTraitement.SupprimerBlocIntegral(i);
+                    }
+                }
+                ProtegerBloc(_document, _document.Range(newStart, blockEnd));
+                DonneesTraitement.AjouterBlocIntegral(newStart, blockEnd, true);
+                //Passer en ignorer toutes les occurence dans le nouveau block
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= newStart && DonneesTraitement.PositionsOccurences[i] <= blockEnd) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.IGNORE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+            }
+        }
+
+        public static bool EstProtegerMot(MSWord.Document current, MSWord.Range wordRange)
+        {
+            //if (wordRange.Words.Count == 0) {
+            //    // Si la sélection est vide, on ne fait rien
+            //    return false;
+            //}
+            //// Un seul mot dans la sélection, on le resélectionne
+            //if (wordRange.Words.Count == 1) {
+            //    wordRange = wordRange.Words.First;
+            //} else {
+            //    wordRange = current.Range(
+            //        wordRange.Words.First.Start,
+            //        wordRange.Words.Last.End
+            //    );
+            //}
+            //wordRange.Select();
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0)
+            {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = current.Range(wordRange.Start + trimmedCount, wordRange.End);
+            }
+            // Le mot sélectionné est au début et n'est pas précédé de suffisament de caractères pour être protégé
+            if (wordRange.Start - DictionnaireDeTravail.PROTECTION_CODE.Length < 0)
+            {
+                return false;
+            }
+            
+            // Get previous range
+            MSWord.Range previous = current.Range(
+                wordRange.Start - DictionnaireDeTravail.PROTECTION_CODE.Length,
+                wordRange.Start
+            );
+            string previousText = previous.Text;
+            return previousText.Equals(DictionnaireDeTravail.PROTECTION_CODE)
+                || wordRange.Text.StartsWith(DictionnaireDeTravail.PROTECTION_CODE);
+        }
+
+        public static bool EstProtegerBloc(string textBefore, string textEvaluated = "")
+        {
+            if (textBefore.TrimEnd().EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G1) || textEvaluated.TrimStart().StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+                return true;
+            }
+            int lastG1 = textBefore.LastIndexOf(DictionnaireDeTravail.PROTECTION_CODE_G1);
+            int lastG2 = textBefore.LastIndexOf(DictionnaireDeTravail.PROTECTION_CODE_G2);
+            if (lastG1 > -1) {
+                return lastG1 > lastG2;
+            }
+
+            return false;
+        }
+
+        public bool EstProtegerBloc(int position)
+        {
+            return EstProtegerBloc(DocumentMainRange.Substring(0,position));
+        }
+
+        public int RetrouverOccurence(Range wordRange)
+        {
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = _document.Range(wordRange.Start + trimmedCount, wordRange.End);
+                //wordRange.Select();
+            }
+
+            string trimmedEnd = wordRange.Text.TrimEnd();
+            if (trimmedEnd.EndsWith("\r")) trimmedEnd = trimmedEnd.Substring(0, trimmedEnd.Length - 1);
+            trimmedCount = wordRange.Text.Length - trimmedEnd.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = _document.Range(wordRange.Start, wordRange.End - trimmedCount);
+                //wordRange.Select();
+            }
+
+            int indexOccurence = DonneesTraitement.PositionsOccurences.FindIndex(p => p == wordRange.Start);
+
+            return indexOccurence >= 0 && trimmedEnd == DonneesTraitement.Occurences[indexOccurence] ? indexOccurence : -1;
         }
 
         /// <summary>
@@ -1340,46 +1661,87 @@ namespace fr.avh.braille.addin
         /// <returns></returns>
         public static MSWord.Range Proteger(MSWord.Document current, MSWord.Range wordRange)
         {
+            //if (wordRange.Words.Count == 0) {
+            //    // Si la sélection est vide, on ne fait rien
+            //    return wordRange;
+            //}
+            
+            //if (wordRange.Words.Count == 1) {
+            //    // Un seul mot dans la sélection, on le resélectionne
+            //    wordRange = wordRange.Words.First;
+            //} else {
+            //    // Plusieurs mots, on sélectionne tout
+            //    wordRange = current.Range(
+            //        wordRange.Words.First.Start,
+            //        wordRange.Words.Last.End
+            //    );
+            //}
+            //wordRange.Select();
             string trimmedStart = wordRange.Text.TrimStart();
             int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
-            if (trimmedCount > 0)
-            {
+            if (trimmedCount > 0) {
                 // Reselectionner le mot sans les espaces de début
                 wordRange = current.Range(wordRange.Start + trimmedCount, wordRange.End);
-                wordRange.Select();
+                //wordRange.Select();
             }
 
-            if (!EstProteger(current, wordRange))
-            {
-                wordRange.InsertBefore(PROTECTION_CODE);
-                wordRange = current.Range(wordRange.Start + PROTECTION_CODE.Length, wordRange.End);
+            string trimmedEnd = wordRange.Text.TrimEnd();
+            if (trimmedEnd.EndsWith("\r")) trimmedEnd = trimmedEnd.Substring(0, trimmedEnd.Length - 1);
+            trimmedCount = wordRange.Text.Length - trimmedEnd.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = current.Range(wordRange.Start, wordRange.End - trimmedCount);
+                //wordRange.Select();
+            }
+
+            if (EstProtegerBloc(current.Range(0, wordRange.Start).Text, wordRange.Text)) {
+                // Si le mot est déjà dans un bloc protégé, on ne le protège pas à nouveau
+                return wordRange;
+            }
+
+            if (wordRange.Words.Count > 1) {
+                // Si un code de protection de mots est déjà sur un mot composé
+                // Le supprimer
+                int start = wordRange.Start;
+                int end = wordRange.End;
+                foreach(Range w in wordRange.Words) {
+                    if (EstProtegerMot(current, w)) {
+                        Range toDelete = current.Range(
+                            w.Start - DictionnaireDeTravail.PROTECTION_CODE.Length,
+                            w.Start
+                        );
+                        toDelete.Delete();
+                        start -= DictionnaireDeTravail.PROTECTION_CODE.Length;
+                        end -= DictionnaireDeTravail.PROTECTION_CODE.Length;
+                    }
+                }
+                wordRange = current.Range(start, end);
+                trimmedEnd = wordRange.Text.TrimEnd();
+                trimmedCount = wordRange.Text.Length - trimmedEnd.Length;
+                if (trimmedCount > 0) {
+                    // Reselectionner le mot sans les espaces de début
+                    wordRange = current.Range(wordRange.Start, wordRange.End - trimmedCount);
+                    //wordRange.Select();
+                }
+                //string textTest = wordRange.Text;
+                // Insérer le code de block
+                wordRange.InsertBefore(DictionnaireDeTravail.PROTECTION_CODE_G1);
+                wordRange.InsertAfter(DictionnaireDeTravail.PROTECTION_CODE_G2);
+                wordRange = current.Range(
+                    wordRange.Start + DictionnaireDeTravail.PROTECTION_CODE_G1.Length,
+                    wordRange.End - DictionnaireDeTravail.PROTECTION_CODE_G2.Length
+                );
+                //textTest = wordRange.Text;
+                //wordRange.Select();
+                return wordRange;
+            }
+            if (!EstProtegerMot(current, wordRange)) {
+                wordRange.InsertBefore(DictionnaireDeTravail.PROTECTION_CODE);
+                wordRange = current.Range(wordRange.Start + DictionnaireDeTravail.PROTECTION_CODE.Length, wordRange.End);
                 wordRange.Select();
             }
+            current.Save();
             return wordRange;
-        }
-
-        public static bool EstProteger(MSWord.Document current, MSWord.Range wordRange)
-        {
-            string trimmedStart = wordRange.Text.TrimStart();
-            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
-            if (trimmedCount > 0)
-            {
-                // Reselectionner le mot sans les espaces de début
-                wordRange = current.Range(wordRange.Start + trimmedCount, wordRange.End);
-            }
-            // Le mot sélectionné est au début et n'est pas précédé de suffisament de caractères pour être protégé
-            if (wordRange.Start - PROTECTION_CODE.Length < 0)
-            {
-                return false;
-            }
-            // Get previous range
-            MSWord.Range previous = current.Range(
-                wordRange.Start - PROTECTION_CODE.Length,
-                wordRange.Start
-            );
-            string previousText = previous.Text;
-            return previousText.Equals(PROTECTION_CODE)
-                || wordRange.Text.StartsWith(PROTECTION_CODE);
         }
 
         /// <summary>
@@ -1401,45 +1763,119 @@ namespace fr.avh.braille.addin
         /// <returns></returns>
         public static MSWord.Range Abreger(Document current, MSWord.Range wordRange)
         {
+            //if (wordRange.Words.Count == 0) {
+            //    // Si la sélection est vide, on ne fait rien
+            //    return wordRange;
+            //}
+
+            //if (wordRange.Words.Count == 1) {
+            //    // Un seul mot dans la sélection, on le resélectionne
+            //    wordRange = wordRange.Words.First;
+            //} else {
+            //    // Plusieurs mots, on sélectionne tout
+            //    wordRange = current.Range(
+            //        wordRange.Words.First.Start,
+            //        wordRange.Words.Last.End
+            //    );
+            //}
+            //wordRange.Select();
             string trimmedStart = wordRange.Text.TrimStart();
             int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
-            if (trimmedCount > 0)
-            {
+            if (trimmedCount > 0) {
                 // Reselectionner le mot sans les espaces de début
                 wordRange = current.Range(wordRange.Start + trimmedCount, wordRange.End);
-                wordRange.Select();
+                //wordRange.Select();
             }
-            if (wordRange.Start - PROTECTION_CODE.Length >= 0)
-            {
+
+            string trimmedEnd = wordRange.Text.TrimEnd();
+            if (trimmedEnd.EndsWith("\r")) trimmedEnd = trimmedEnd.Substring(0, trimmedEnd.Length - 1);
+            trimmedCount = wordRange.Text.Length - trimmedEnd.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = current.Range(wordRange.Start, wordRange.End - trimmedCount);
+                //wordRange.Select();
+            }
+            if (EstProtegerMot(current, wordRange)) {
                 MSWord.Range previous = current.Range(
-                    wordRange.Start - PROTECTION_CODE.Length,
+                    wordRange.Start - DictionnaireDeTravail.PROTECTION_CODE.Length,
                     wordRange.Start
                 );
                 string previousText = previous.Text;
                 // First check if text is preceded by protection code
-                if (previousText.Equals(PROTECTION_CODE))
-                {
+                if (previousText.Equals(DictionnaireDeTravail.PROTECTION_CODE)) {
                     Range toDelete = current.Range(
-                        wordRange.Start - PROTECTION_CODE.Length,
+                        wordRange.Start - DictionnaireDeTravail.PROTECTION_CODE.Length,
                         wordRange.Start
                     );
                     toDelete.Delete();
                     wordRange = current.Range(toDelete.End, wordRange.End);
-                    wordRange.Select();
+                    //wordRange.Select();
+                    return wordRange;
+                }
+
+                if (trimmedStart.StartsWith(DictionnaireDeTravail.PROTECTION_CODE)) {
+                    Range toDelete = current.Range(
+                        wordRange.Start,
+                        wordRange.Start + DictionnaireDeTravail.PROTECTION_CODE.Length
+                    );
+                    toDelete.Delete();
+                    wordRange = current.Range(toDelete.End, wordRange.End);
+                    //wordRange.Select();
+                    return wordRange;
+                }
+            } else {
+                string previousText = current.Range(
+                    0,
+                    wordRange.Start
+                ).Text;
+                string currentText = current.Range(
+                    wordRange.Start,
+                    wordRange.End
+                ).Text;
+                string nextText = current.Range(
+                    wordRange.End,
+                    current.Content.End
+                ).Text;
+                int start = wordRange.Start;
+                int end = wordRange.End;
+                Range toDeleteBefore = null;
+                Range toDeleteAfter = null;
+                if (previousText.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+                    toDeleteBefore = current.Range(
+                        start - DictionnaireDeTravail.PROTECTION_CODE_G1.Length,
+                        start
+                    );
+                }
+                if (currentText.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+                    toDeleteBefore = current.Range(
+                        start,
+                        start + DictionnaireDeTravail.PROTECTION_CODE_G1.Length
+                    );
+                }
+                if (currentText.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)) {
+                    toDeleteAfter = current.Range(
+                        end - DictionnaireDeTravail.PROTECTION_CODE_G2.Length,
+                        end
+                    );
+                }
+                if (nextText.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)) {
+                    toDeleteAfter = current.Range(
+                        end - DictionnaireDeTravail.PROTECTION_CODE_G2.Length,
+                        end
+                    );
+                }
+                if(toDeleteBefore != null && toDeleteAfter != null) {
+                    toDeleteAfter.Delete();
+                    toDeleteBefore.Delete();
+                    wordRange = current.Range(
+                        toDeleteBefore.End,
+                        toDeleteAfter.Start
+                    );
+                    //string testTExt = wordRange.Text;
                 }
             }
-            // check if selection starts with protection code
-            if (trimmedStart.StartsWith(PROTECTION_CODE))
-            {
-                Range toDelete = current.Range(
-                    wordRange.Start,
-                    wordRange.Start + PROTECTION_CODE.Length
-                );
-                toDelete.Delete();
-                wordRange = current.Range(toDelete.End, wordRange.End);
-                wordRange.Select();
-            }
-            string word = wordRange.Text.ToLower().Trim();
+            
+
             return wordRange;
         }
 
@@ -1454,34 +1890,289 @@ namespace fr.avh.braille.addin
             return Abreger(_document, wordRange);
         }
 
-        /// <summary>
-        /// Marquer le mot sélectionné comme étant à protéger dans le traitement
-        /// </summary>
-        /// <param name="wordRange"></param>
-        public void MarquerPourProtection(MSWord.Range wordRange)
+
+        public void AbregerBloc(MSWord.Range wordRange)
         {
-            string wordSelected = wordRange.Text.ToLower().Trim().ToLower();
-            WorkingDictionnary.SetStatut(wordSelected, Statut.PROTEGE);
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = _document.Range(wordRange.Start + trimmedCount, wordRange.End);
+                //wordRange.Select();
+            }
+
+            string trimmedEnd = wordRange.Text.TrimEnd();
+            if (trimmedEnd.EndsWith("\r")) trimmedEnd = trimmedEnd.Substring(0, trimmedEnd.Length - 1);
+            trimmedCount = wordRange.Text.Length - trimmedEnd.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = _document.Range(wordRange.Start, wordRange.End - trimmedCount);
+                //wordRange.Select();
+            }
+
+            if (wordRange.Text.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)){
+                wordRange = _document.Range(wordRange.Start + DictionnaireDeTravail.PROTECTION_CODE_G1.Length, wordRange.End);
+            }
+            if (wordRange.Text.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)){
+                wordRange = _document.Range(wordRange.Start, wordRange.End - +DictionnaireDeTravail.PROTECTION_CODE_G2.Length);
+            }
+            wordRange.Select();
+            int indexDebut = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.Start && wordRange.Start <= t.Item2);
+            int indexFin = DonneesTraitement.ListeBlocsIntegral.FindIndex((t) => t.Item1 <= wordRange.End && wordRange.End <= t.Item2);
+
+            if (indexDebut < 0 && indexFin < 0) {
+                // Rien a faire, deja abreger
+                return;
+            } else if (indexDebut == indexFin) {
+
+                // TODO : séprarer le bloc intégral en 3 partie (integral abrege integrale
+                int block1Start = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int block2End = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
+                int block2Length = block2End - wordRange.End;
+                int block1Length = wordRange.Start - block1Start;
+
+                string testText = _document.Range(block1Start, block2End).Text;
+
+                // Supprimer le bloc courant et renvoie la position du bloc "abrege"
+                wordRange = AbregerBloc(_document, _document.Range(block1Start, block2End));
+                block1Start = wordRange.Start;
+                block2End = wordRange.End;
+                DonneesTraitement.SupprimerBlocIntegral(indexDebut, true);
+
+                // traitement Bloc abreger : 
+                int start = block1Start + block1Length;
+                int length = block2End - block2Length - start;
+                //Passage en abrege des occurences (et remise a jour des positions
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+
+                // Reajouter un sous block 1 avant s'il y avait d'autres mots
+                if (block1Length > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(block1Start, block1Start + block1Length));
+                    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                    start = wordRange.End;
+                }
+                // Reajouter un bloc a la fin s'il y avait d'autres mots
+                if (block2Length > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(block2End - block2Length, block2End));
+                    DonneesTraitement.AjouterBlocIntegral(block2End - block2Length, block2End, true);
+                }
+                
+
+            } else if (indexDebut >= 0 && indexDebut < indexFin) {
+                // supprimer les bloc intermédiaire et remplacer les blocks de début et de fin
+                int block1Start = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int block1End = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
+                int block2Start = DonneesTraitement.ListeBlocsIntegral[indexFin].Item1;
+                int block2End = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
+               
+                int textAbregerAttendu = wordRange.Text.Replace(DictionnaireDeTravail.PROTECTION_CODE_G1,"").Replace(DictionnaireDeTravail.PROTECTION_CODE_G2, "").Length;
+
+                int block2Length = block2End - wordRange.End;
+                int block1Length = wordRange.Start - block1Start;
+
+                // Supprimer tous les blocs dans la plage [indexDebut, indexFin]
+                for (int i = indexFin; i >= indexDebut; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    wordRange = AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                    DonneesTraitement.SupprimerBlocIntegral(i);
+                }
+                block1Start = wordRange.Start;
+                
+                // Bloc abreger : 
+                int start = block1Start + block1Length;
+                int length = textAbregerAttendu;
+                //Passage en abrege des occurences (et remise a jour des positions
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+
+                block2Start = start + length;
+                if (block1Length > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(block1Start, block1Start + block1Length));
+                    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                    start = wordRange.End;
+                    block2Start = start + length;
+                }
+                // Reajouter un bloc a la fin s'il y avait d'autres mots
+                if (block2Length > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(block2Start, block2Start + block2Length));
+                    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                }
+               
+
+            } else if (indexDebut >= 0 && indexFin < 0) {
+                // réduction d'un bloc existant vers son début
+                int block1Start = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item1;
+                int block1End = DonneesTraitement.ListeBlocsIntegral[indexDebut].Item2;
+                int block1Length = wordRange.Start - block1Start;
+                int endAbreger = wordRange.End;
+
+                int textAbregerAttendu = wordRange.Text.Replace(DictionnaireDeTravail.PROTECTION_CODE_G1, "").Replace(DictionnaireDeTravail.PROTECTION_CODE_G2, "").Length;
+                
+                // Supprimer les bloc dans la plage
+                for (int i = DonneesTraitement.ListeBlocsIntegral.Count - 1; i >= indexDebut; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    if (bloc.Item1 >= block1Start && bloc.Item2 <= endAbreger) {
+                        // On trouve un bloc qui commence après le début du bloc actuel et avant la fin du nouveau bloc
+                        wordRange = AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                        DonneesTraitement.SupprimerBlocIntegral(i);
+                    }
+                }
+
+                block1Start = wordRange.Start;
+                // Bloc abreger : 
+                int start = block1Start + block1Length;
+                int length = textAbregerAttendu;
+                //Passage en abrege des occurences (et remise a jour des positions
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+
+                // S'il restait des mots avant le nouveau bloc, on reprotège partiellement le dernier bloc abrègé
+                if (block1Length > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(block1Start, block1Start + block1Length));
+                    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                    start = wordRange.End;
+                }
+
+            } else if (indexDebut < 0 && indexFin >= 0) {
+
+                // réduction d'un bloc existant vers son début
+                int block2Start = DonneesTraitement.ListeBlocsIntegral[indexFin].Item1;
+                int block2End = DonneesTraitement.ListeBlocsIntegral[indexFin].Item2;
+                int block2Length = block2End - wordRange.End;
+
+                int start = wordRange.Start;
+                int textAbregerAttendu = wordRange.Text.Replace(DictionnaireDeTravail.PROTECTION_CODE_G1, "").Replace(DictionnaireDeTravail.PROTECTION_CODE_G2, "").Length;
+                int length = textAbregerAttendu;
+               
+                // Supprimer les bloc entre le bloc de fin et le début qui sont dans la sélection
+                for (int i = indexFin; i >= 0; i--) {
+                    var bloc = DonneesTraitement.ListeBlocsIntegral[i];
+                    if (bloc.Item1 >= start && bloc.Item2 <= block2End) {
+                        // On trouve un bloc qui commence après le début du bloc actuel et avant la fin du nouveau bloc
+                        wordRange = AbregerBloc(_document, _document.Range(bloc.Item1, bloc.Item2));
+                        DonneesTraitement.SupprimerBlocIntegral(i);
+                    }
+                }
+                //Passage en abrege des occurences (et remise a jour des positions
+                for (int i = 0; i < DonneesTraitement.Occurences.Count; i++) {
+                    if (DonneesTraitement.PositionsOccurences[i] >= start && DonneesTraitement.PositionsOccurences[i] < (start + length)) {
+                        DonneesTraitement.StatutsOccurences[i] = Statut.ABREGE;
+                        DonneesTraitement.StatutsAppliquer[i] = true;
+                    }
+                }
+                block2Start = start + length;
+                // Reajouter un bloc a la fin s'il y avait d'autres mots
+                if (block2Length > 0) {
+                    wordRange = ProtegerBloc(_document, _document.Range(block2Start, block2Start + block2Length));
+                    DonneesTraitement.AjouterBlocIntegral(wordRange.Start, wordRange.End, true);
+                }
+            }
+            ChargerTexteEnMemoire();
         }
 
-        /// <summary>
-        /// Marquer le mot sélectionné comme étant à abréger dans le traitement
-        /// </summary>
-        /// <param name="wordRange"></param>
-        public void MarquerPourAbreviation(MSWord.Range wordRange)
+        public static MSWord.Range AbregerBloc(Document current, MSWord.Range wordRange)
         {
-            string wordSelected = wordRange.Text.ToLower().Trim().ToLower();
-            WorkingDictionnary.SetStatut(wordSelected, Statut.ABREGE);
+            //if (wordRange.Words.Count == 0) {
+            //    // Si la sélection est vide, on ne fait rien
+            //    return wordRange;
+            //}
+
+            //if (wordRange.Words.Count == 1) {
+            //    // Un seul mot dans la sélection, on le resélectionne
+            //    wordRange = wordRange.Words.First;
+            //} else {
+            //    // Plusieurs mots, on sélectionne tout
+            //    wordRange = current.Range(
+            //        wordRange.Words.First.Start,
+            //        wordRange.Words.Last.End
+            //    );
+            //}
+            //wordRange.Select();
+            string trimmedStart = wordRange.Text.TrimStart();
+            int trimmedCount = wordRange.Text.Length - trimmedStart.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = current.Range(wordRange.Start + trimmedCount, wordRange.End);
+                //wordRange.Select();
+            }
+
+            string trimmedEnd = wordRange.Text.TrimEnd();
+            if (trimmedEnd.EndsWith("\r")) trimmedEnd = trimmedEnd.Substring(0, trimmedEnd.Length - 1);
+            trimmedCount = wordRange.Text.Length - trimmedEnd.Length;
+            if (trimmedCount > 0) {
+                // Reselectionner le mot sans les espaces de début
+                wordRange = current.Range(wordRange.Start, wordRange.End - trimmedCount);
+                //wordRange.Select();
+            }
+
+            string previousText = current.Range(
+                    0,
+                    wordRange.Start
+                ).Text ?? "";
+            string currentText = current.Range(
+                wordRange.Start,
+                wordRange.End
+            ).Text ?? "";
+            string nextText = current.Range(
+                wordRange.End,
+                current.Content.End
+            ).Text ?? "";
+            int start = wordRange.Start;
+            int end = wordRange.End;
+
+            Range toDeleteBefore = null;
+            Range toDeleteAfter = null;
+            if (previousText.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+                toDeleteBefore = current.Range(
+                    start - DictionnaireDeTravail.PROTECTION_CODE_G1.Length,
+                    start
+                );
+            }
+            if (currentText.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+                toDeleteBefore = current.Range(
+                    start,
+                    start + DictionnaireDeTravail.PROTECTION_CODE_G1.Length
+                );
+            }
+            if (currentText.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)) {
+                toDeleteAfter = current.Range(
+                    end - DictionnaireDeTravail.PROTECTION_CODE_G2.Length,
+                    end
+                );
+            }
+            if (nextText.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)) {
+                toDeleteAfter = current.Range(
+                    end,
+                    end + DictionnaireDeTravail.PROTECTION_CODE_G2.Length
+                );
+            }
+            if (toDeleteBefore != null && toDeleteAfter != null) {
+                toDeleteAfter.Select();
+                toDeleteAfter.Delete();
+                toDeleteBefore.Select();
+                toDeleteBefore.Delete();
+                wordRange = current.Range(
+                    toDeleteBefore.End,
+                    toDeleteAfter.Start
+                );
+            }
+            return wordRange;
         }
 
-        /// <summary>
-        /// Marquer le mot sélectionné comme ambigu, c'est à dire a traiter au cas par cas
-        /// </summary>
-        /// <param name="wordRange"></param>
-        public void MarquerCommeAmbigu(MSWord.Range wordRange)
-        {
-            string wordSelected = wordRange.Text.ToLower().Trim().ToLower();
-        }
+        
 
         /// <summary>
         /// Vérifie si le traitement est terminé, c'est à dire si toutes les occurences ont été traité
@@ -1489,8 +2180,8 @@ namespace fr.avh.braille.addin
         /// <param name="wordRange"></param>
         public bool EstTerminer()
         {
-            // Si toute les occurences ont vu leur statuts attribué
-            return WorkingDictionnary.StatutsOccurences.All(s => s != Statut.INCONNU);
+            // Si toute les occurences ont vu leur statuts attribué et appliquer
+            return DonneesTraitement.StatutsOccurences.All(s => s != Statut.INCONNU) && DonneesTraitement.StatutsAppliquer.All(s => s);
         }
 
         #endregion
@@ -1506,18 +2197,18 @@ namespace fr.avh.braille.addin
         /// <returns></returns>
         public MSWord.Range ProchainMot(int andOccurence = 0)
         {
-            string occurenceSelected = WorkingDictionnary.Occurences[SelectedOccurence];
+            string occurenceSelected = DonneesTraitement.Occurences[Occurence];
             string wordSelected = occurenceSelected.ToLower();
-            List<string> keys = WorkingDictionnary.CarteMotOccurences.Keys.ToList();
+            List<string> keys = DonneesTraitement.CarteMotOccurences.Keys.ToList();
             int newWordKeyIndex = (keys.Count + keys.IndexOf(wordSelected) + 1) % keys.Count;
             return SelectionnerOccurenceMot(keys[newWordKeyIndex], andOccurence);
         }
 
         public MSWord.Range PrecedentMot(int andOccurence = 0)
         {
-            string occurenceSelected = WorkingDictionnary.Occurences[SelectedOccurence];
+            string occurenceSelected = DonneesTraitement.Occurences[Occurence];
             string wordSelected = occurenceSelected.ToLower();
-            List<string> keys = WorkingDictionnary.CarteMotOccurences.Keys.ToList();
+            List<string> keys = DonneesTraitement.CarteMotOccurences.Keys.ToList();
             int newWordKeyIndex = (keys.Count + keys.IndexOf(wordSelected) - 1) % keys.Count;
             return SelectionnerOccurenceMot(keys[newWordKeyIndex], andOccurence);
         }
@@ -1529,13 +2220,14 @@ namespace fr.avh.braille.addin
         public MSWord.Range IgnorerMotEtSelectionnerSuivant()
         {
             // Récupération du mot précédent à partir de la carte actuel
-            string wordSelected = SelectedWord.ToLower();
+            string wordSelected = MotSelectionne.ToLower();
 
-            // listes des occurences a supprimer de la liste
-            List<int> wordOccurences = WorkingDictionnary.CarteMotOccurences[wordSelected];
-            foreach (var occurence in WorkingDictionnary.CarteMotOccurences[wordSelected])
+            // listes des occurences a marquer comme étant ignorer, c'est à dire a ne pas afficher dans le traitement
+            List<int> wordOccurences = DonneesTraitement.CarteMotOccurences[wordSelected];
+            foreach (var occurence in DonneesTraitement.CarteMotOccurences[wordSelected])
             {
-                WorkingDictionnary.StatutsOccurences[occurence] = Statut.IGNORE;
+                DonneesTraitement.StatutsOccurences[occurence] = Statut.IGNORE;
+                DonneesTraitement.StatutsAppliquer[occurence] = true;
             }
 
             // Sélectionner le mot suivant
@@ -1544,16 +2236,16 @@ namespace fr.avh.braille.addin
 
         public MSWord.Range ProchaineOccurenceDuMot()
         {
-            string occurenceSelected = WorkingDictionnary.Occurences[SelectedOccurence];
+            string occurenceSelected = DonneesTraitement.Occurences[Occurence];
             string wordSelected = occurenceSelected.ToLower();
-            List<int> occurences = WorkingDictionnary.CarteMotOccurences[wordSelected];
+            List<int> occurences = DonneesTraitement.CarteMotOccurences[wordSelected];
             int wordOccurenceIndex =
-                (occurences.Count + occurences.IndexOf(SelectedOccurence) + 1) % occurences.Count;
-            int wordSelectedOccurence = WorkingDictionnary.CarteMotOccurences[
+                (occurences.Count + occurences.IndexOf(Occurence) + 1) % occurences.Count;
+            int wordSelectedOccurence = DonneesTraitement.CarteMotOccurences[
                 occurenceSelected.ToLower()
             ][wordOccurenceIndex];
-            string searchedWord = WorkingDictionnary.Occurences[wordSelectedOccurence];
-            string contextBefore = WorkingDictionnary.ContextesAvantOccurences[
+            string searchedWord = DonneesTraitement.Occurences[wordSelectedOccurence];
+            string contextBefore = DonneesTraitement.ContextesAvantOccurences[
                 wordSelectedOccurence
             ];
             try
@@ -1576,7 +2268,7 @@ namespace fr.avh.braille.addin
                         docRange.End
                     );
                     SelectedRange = docRange;
-                    SelectedOccurence = wordSelectedOccurence;
+                    Occurence = wordSelectedOccurence;
                 }
                 else
                 {
@@ -1588,7 +2280,7 @@ namespace fr.avh.braille.addin
                 var rangeStart = SelectedRange.Start;
                 var rangeEnd = SelectedRange.End;
                 var docEnd = _document.StoryRanges[WdStoryType.wdMainTextStory].End;
-                SelectedOccurence = -1;
+                Occurence = -1;
             }
 
             return SelectedRange;
@@ -1596,10 +2288,10 @@ namespace fr.avh.braille.addin
 
         public MSWord.Range PrecedenteOccurenceDuMot()
         {
-            string occurenceSelected = WorkingDictionnary.Occurences[SelectedOccurence];
+            string occurenceSelected = DonneesTraitement.Occurences[Occurence];
             string wordSelected = occurenceSelected.ToLower();
-            List<int> occurences = WorkingDictionnary.CarteMotOccurences[wordSelected];
-            int wordOccurenceIndex = occurences.IndexOf(SelectedOccurence);
+            List<int> occurences = DonneesTraitement.CarteMotOccurences[wordSelected];
+            int wordOccurenceIndex = occurences.IndexOf(Occurence);
             return wordOccurenceIndex == 0
                 ? PrecedentMot(-1)
                 : SelectionnerOccurence(occurences[wordOccurenceIndex - 1]);
@@ -1613,9 +2305,9 @@ namespace fr.avh.braille.addin
         public void ProtegerMot(string mot)
         {
             string wordSelected = mot.ToLower();
-            foreach (var idx in WorkingDictionnary.CarteMotOccurences[wordSelected])
+            foreach (var idx in DonneesTraitement.CarteMotOccurences[wordSelected])
             {
-                WorkingDictionnary.StatutsOccurences[idx] = Statut.PROTEGE;
+                DonneesTraitement.StatutsOccurences[idx] = Statut.PROTEGE;
                 Range current = SelectionnerOccurence(idx);
                 Proteger(current);
             }
@@ -1629,9 +2321,9 @@ namespace fr.avh.braille.addin
         public void AbregerMot(string mot)
         {
             string wordSelected = mot.ToLower();
-            foreach (var idx in WorkingDictionnary.CarteMotOccurences[wordSelected])
+            foreach (var idx in DonneesTraitement.CarteMotOccurences[wordSelected])
             {
-                WorkingDictionnary.StatutsOccurences[idx] = Statut.ABREGE;
+                DonneesTraitement.StatutsOccurences[idx] = Statut.ABREGE;
                 Range current = SelectionnerOccurence(idx);
                 Abreger(current);
             }
@@ -1648,8 +2340,11 @@ namespace fr.avh.braille.addin
         public MSWord.Range SelectedRange
         {
             get => _selectedRange;
-            private set { _selectedRange = value; }
+            private set { _selectedRange = value; _selectedRange.Select(); }
         }
+
+        public int OccurenceSelectionnee { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
 
         /// <summary>
         /// Selectionne une occurence identifié pour traitement dans le document
@@ -1658,13 +2353,17 @@ namespace fr.avh.braille.addin
         /// <returns></returns>
         public MSWord.Range SelectionnerOccurence(int newSelectedOccurenceIndex)
         {
-            if (WorkingDictionnary.Occurences.Count == 0)
+            if (DonneesTraitement.Occurences.Count == 0)
             {
                 throw new Exception("Aucun mot n'a été détecté pour traitement dans le document");
             }
-            SelectedOccurence = newSelectedOccurenceIndex;
-            int startPosition = WorkingDictionnary.PositionsOccurences[SelectedOccurence];
-            SelectedRange = _document.Range(startPosition, startPosition + SelectedWord.Length);
+            if (newSelectedOccurenceIndex < 0 || newSelectedOccurenceIndex >= DonneesTraitement.Occurences.Count) {
+                throw new Exception($"L'occurence {newSelectedOccurenceIndex} n'est pas valide");
+            }
+            Occurence = newSelectedOccurenceIndex;
+
+            int startPosition = DonneesTraitement.PositionsOccurences[Occurence];
+            SelectedRange = _document.Range(startPosition, startPosition + MotSelectionne.Length);
             return SelectedRange;
         }
 
@@ -1676,19 +2375,19 @@ namespace fr.avh.braille.addin
         /// <returns></returns>
         public MSWord.Range SelectionnerOccurenceMot(string key, int indexCarte = 0)
         {
-            if (WorkingDictionnary.Occurences.Count == 0)
+            if (DonneesTraitement.Occurences.Count == 0)
             {
                 throw new Exception("Aucun mot n'a été détecté pour traitement dans le document");
             }
-            if (!WorkingDictionnary.CarteMotOccurences.ContainsKey(key.ToLower()))
+            if (!DonneesTraitement.CarteMotOccurences.ContainsKey(key.ToLower()))
             {
                 throw new Exception($"Le mot {key} n'est pas détecter dans la carte des mots");
             }
             // Passage par les positions précalculés, plus efficace et plus rapide que le passage dans le finder de word (mais plus fragile si le texte est modifié)
-            SelectedOccurence = WorkingDictionnary.CarteMotOccurences[key.ToLower()][indexCarte];
-            int startPosition = WorkingDictionnary.PositionsOccurences[SelectedOccurence];
-
-            SelectedRange = _document.Range(startPosition, startPosition + SelectedWord.Length);
+            Occurence = DonneesTraitement.CarteMotOccurences[key.ToLower()][indexCarte];
+            int startPosition = DonneesTraitement.PositionsOccurences[Occurence];
+            SelectedRange = _document.Range(startPosition, startPosition + MotSelectionne.Length);
+            
             return SelectedRange;
         }
 
@@ -1698,15 +2397,15 @@ namespace fr.avh.braille.addin
         /// <returns></returns>
         public MSWord.Range ProchaineOccurence()
         {
-            SelectedOccurence =
-                (WorkingDictionnary.Occurences.Count + SelectedOccurence + 1)
-                % WorkingDictionnary.Occurences.Count;
-            string occurenceSelected = WorkingDictionnary.Occurences[SelectedOccurence];
-            string contextBefore = WorkingDictionnary.ContextesAvantOccurences[SelectedOccurence];
+            Occurence =
+                (DonneesTraitement.Occurences.Count + Occurence + 1)
+                % DonneesTraitement.Occurences.Count;
+            string occurenceSelected = DonneesTraitement.Occurences[Occurence];
+            string contextBefore = DonneesTraitement.ContextesAvantOccurences[Occurence];
             int lastOccurenceEnd = SelectedRange.End;
             int documentEnd = _document.Content.End;
             Range toEnd =
-                SelectedOccurence == 0
+                Occurence == 0
                     ? _document.Content
                     : _document.Range(lastOccurenceEnd, documentEnd);
             var finder = toEnd.Find;
@@ -1727,7 +2426,7 @@ namespace fr.avh.braille.addin
             {
                 // Fallback : redo the search without whole word
                 toEnd =
-                    SelectedOccurence == 0
+                    Occurence == 0
                         ? _document.Content
                         : _document.Range(lastOccurenceEnd, _document.Content.End);
                 finder = toEnd.Find;
@@ -1772,16 +2471,16 @@ namespace fr.avh.braille.addin
         {
             if (
                 reselectionOccurenceCourante
-                && (SelectedOccurenceStatut == Statut.INCONNU || !SelectedOccurenceEstTraitee) /*|| EstTerminer()*/
+                && (StatutOccurence == Statut.INCONNU || !OccurenceEstTraitee) /*|| EstTerminer()*/
             )
             {
                 return SelectedRange;
             }
-            int counter = SelectedOccurence;
-            while (counter < WorkingDictionnary.Occurences.Count)
+            int counter = Occurence;
+            while (counter < DonneesTraitement.Occurences.Count)
             {
                 Range selected = ProchaineOccurence();
-                if (SelectedOccurenceStatut == Statut.INCONNU || !SelectedOccurenceEstTraitee)
+                if (StatutOccurence == Statut.INCONNU || !OccurenceEstTraitee)
                 {
                     return selected;
                 }
@@ -1798,17 +2497,17 @@ namespace fr.avh.braille.addin
         /// <returns></returns>
         public MSWord.Range PrecedenteOccurence()
         {
-            SelectedOccurence =
-                (WorkingDictionnary.Occurences.Count + SelectedOccurence - 1)
-                % WorkingDictionnary.Occurences.Count;
-            string occurenceSelected = WorkingDictionnary.Occurences[SelectedOccurence];
+            Occurence =
+                (DonneesTraitement.Occurences.Count + Occurence - 1)
+                % DonneesTraitement.Occurences.Count;
+            string occurenceSelected = DonneesTraitement.Occurences[Occurence];
             string wordSelected = occurenceSelected.ToLower();
-            string contextBefore = WorkingDictionnary.ContextesAvantOccurences[SelectedOccurence];
-            int wordOccurenceIndex = WorkingDictionnary.CarteMotOccurences[wordSelected].IndexOf(
-                SelectedOccurence
+            string contextBefore = DonneesTraitement.ContextesAvantOccurences[Occurence];
+            int wordOccurenceIndex = DonneesTraitement.CarteMotOccurences[wordSelected].IndexOf(
+                Occurence
             );
             Range toBegining =
-                SelectedOccurence == WorkingDictionnary.Occurences.Count - 1
+                Occurence == DonneesTraitement.Occurences.Count - 1
                     ? _document.StoryRanges[WdStoryType.wdMainTextStory]
                     : _document.Range(
                         _document.StoryRanges[WdStoryType.wdMainTextStory].Start,
@@ -1843,40 +2542,70 @@ namespace fr.avh.braille.addin
         public void AppliquerStatutSurOccurence(int index, Statut statut)
         {
             Range current =
-                index != SelectedOccurence ? SelectionnerOccurence(index) : SelectedRange;
-            SelectedOccurenceStatut = statut;
-            SelectedOccurenceEstTraitee = statut != Statut.INCONNU;
-            if (statut == Statut.PROTEGE)
-            {
-                if (!EstProteger(_document, current))
-                {
-                    // Ajouter ProtectionCodeLength a la position de l'occurence et  de toutes les occurences qui suivent
-                    for (int i = index; i < WorkingDictionnary.Occurences.Count; i++)
-                    {
-                        WorkingDictionnary.PositionsOccurences[i] += PROTECTION_CODE.Length;
+                index != Occurence ? SelectionnerOccurence(index) : SelectedRange;
+            int start = current.Start;
+            int end = current.End;
+            int newStart = start;
+            // Je pars du principe que le code de protection est en dehors du texte de l'occurence
+            bool estProtegerBloc = EstProtegerBloc(current.Start);
+            bool estProtegerMot = EstProtegerMot(_document, current);
+            int offsetCurrent = 0;
+            int offsetNext = 0;
+            // On ne change les statuts que sur les occurences qui sont hors de blocs intégrales
+            if (!estProtegerBloc) {
+                if (statut == Statut.PROTEGE && !estProtegerMot) {
+                    Range t = Proteger(current);
+                    newStart = t.Start;
+                    int newEnd = t.End;
+                    bool estMaintenantProtegerBloc = EstProtegerBloc(t.Start);
+                    offsetCurrent = estMaintenantProtegerBloc ? DictionnaireDeTravail.PROTECTION_CODE_G1.Length : DictionnaireDeTravail.PROTECTION_CODE.Length;
+                    offsetNext = estMaintenantProtegerBloc ? DictionnaireDeTravail.PROTECTION_CODE_G2.Length : 0;
+                    if (estMaintenantProtegerBloc) { // Garder une trace du bloc integral
+                        DonneesTraitement.AjouterBlocIntegral(newStart,newEnd);
                     }
-                    Proteger(current);
+                    
+                } else if (statut != Statut.PROTEGE && estProtegerMot) {
+                    Range t = Abreger(current);
+                    offsetCurrent -= DictionnaireDeTravail.PROTECTION_CODE.Length;
+                }
+            } else if(statut != Statut.PROTEGE) {
+                // Si le bloc est uniquement un bloc de protection de mot composé
+                // On peut supprimer le bloc
+                int indexBloc = DonneesTraitement.ListeBlocsIntegral.FindIndex(b => b.Item1 <= start && end <= b.Item2);
+                if(indexBloc > -1) {
+                    int blockStart = DonneesTraitement.ListeBlocsIntegral[indexBloc].Item1;
+                    int blockEnd = DonneesTraitement.ListeBlocsIntegral[indexBloc].Item2;
+                    if(blockStart == start && blockEnd == end) {
+                        Range t = AbregerBloc(_document, _document.Range(blockStart, blockEnd));
+                        DonneesTraitement.SupprimerBlocIntegral(indexBloc);
+                        offsetCurrent -= DictionnaireDeTravail.PROTECTION_CODE_G1.Length;
+                        offsetNext -= DictionnaireDeTravail.PROTECTION_CODE_G2.Length;
+                    }
                 }
             }
-            else
-            {
-                if (EstProteger(_document, current))
-                {
-                    // Enlever ProtectionCodeLength a la position de l'occurence et toutes les occurences qui suivent
-                    for (int i = index; i < WorkingDictionnary.Occurences.Count; i++)
-                    {
-                        WorkingDictionnary.PositionsOccurences[i] -= PROTECTION_CODE.Length;
-                    }
-                    Abreger(current);
-                }
-            }
+            // Sauvegarder le statut de l'occurence et les décallages de positions ajouter par le traitement
+            DonneesTraitement.AppliquerStatut(index, statut, offsetCurrent, offsetNext);
         }
+
 
         /// <summary>
         /// Mise a jour du texte en mémoire pour eviter la reanalyse (par exemple apres application des statuts)
         /// </summary>
-        public void RechargerTexteEnMemoire()
+        public void ChargerTexteEnMemoire()
         {
+            // Suppression de tous les hyperliens créer parfois automatiquement par word ...
+            foreach (MSWord.Hyperlink link in _document.Hyperlinks) {
+                link.Delete();
+            }
+            // Loop through fields in reverse to safely delete
+            for (int i = _document.Fields.Count; i >= 1; i--) {
+                MSWord.Field field = _document.Fields[i];
+                if (field.Type == MSWord.WdFieldType.wdFieldHyperlink) {
+                    field.Unlink(); // Replaces hyperlink with its display text
+                }
+            }
+            // Sauvegarde, sinon risque de corruption du texte en mémoire
+            _document.Save();
             this.TexteEnMemoire = DocumentMainRange;
         }
 
@@ -1886,12 +2615,163 @@ namespace fr.avh.braille.addin
         /// <param name="index"></param>
         public void AfficherOccurence(int index)
         {
-            if (index != SelectedOccurence)
+            if (index != Occurence)
             {
                 SelectionnerOccurence(index);
             }
             SelectedRange.Select();
         }
+
+        #endregion
+
+        #region backup code inutilisé
+
+
+        //public void AppliquerStatutSurBlock(int start, int end, Statut statut)
+        //{
+        //    int blocIndexOfStart = DonneesTraitement.ListeBlocsIntegral.FindIndex(b => b.Item1 <= start && start <= b.Item2);
+        //    int blocIndexOfEnd = DonneesTraitement.ListeBlocsIntegral.FindIndex(b => b.Item1 <= end && end <= b.Item2);
+
+        //    int newBlockStart = blocIndexOfStart > -1 ? DonneesTraitement.ListeBlocsIntegral[blocIndexOfStart].Item1 : start;
+        //    int newBlockEnd = blocIndexOfEnd > -1 ? DonneesTraitement.ListeBlocsIntegral[blocIndexOfEnd].Item2 : end;
+
+        //    // Ajouter le nouveau block a la fin
+        //    DonneesTraitement.DebutsBlocsIntegrals.Add(newBlockStart);
+        //    DonneesTraitement.FinsBlocsIntegrals.Add(newBlockEnd);
+
+        //    int decalage = 0;
+        //    // En parcours arriere, supprimer les blocks précédents situés dans le nouveau block
+        //    for (int i = DonneesTraitement.ListeBlocsIntegral.Count - 2; i >= 0; i--) {
+        //        if (newBlockStart <= DonneesTraitement.ListeBlocsIntegral[i].Item1 && DonneesTraitement.ListeBlocsIntegral[i].Item2 <= newBlockEnd) {
+        //            DonneesTraitement.DebutsBlocsIntegrals.RemoveAt(i);
+        //            DonneesTraitement.FinsBlocsIntegrals.RemoveAt(i);
+        //            i--;
+        //        }
+        //    }
+
+        //    Range toProtect = _document.Range(newBlockStart, newBlockEnd);
+        //    if (!toProtect.Text.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+        //        toProtect.InsertBefore(DictionnaireDeTravail.PROTECTION_CODE_G1);
+        //        decalage += DictionnaireDeTravail.PROTECTION_CODE_G1.Length;
+        //    }
+        //    if (!toProtect.Text.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)) {
+        //        toProtect.InsertAfter(DictionnaireDeTravail.PROTECTION_CODE_G2);
+        //        decalage += DictionnaireDeTravail.PROTECTION_CODE_G2.Length;
+        //    }
+
+        //    DonneesTraitement.DebutsBlocsIntegrals.Sort();
+        //    DonneesTraitement.FinsBlocsIntegrals.Sort();
+        //}
+
+        /// <summary>
+        /// Protege les phrases identifiées comme étrangères dans le document.
+        /// Si des mots étrangers isolés sont détectés, ils sont retourné dans une liste de tuple (position, mot)
+        /// Desactiver car beaucoup trop lent
+        /// </summary>
+        /// <returns></returns>
+        //public List<Tuple<int, string>> TraiterPhrasesEtrangere()
+        //{
+        //    List<Tuple<int, string>> motsPossiblementEtrangers = new List<Tuple<int, string>>();
+        //    List<MSWord.Range> motsEtrangesConsecutifs = new List<MSWord.Range>();
+        //    bool isInCode = false;
+        //    info?.Invoke(
+        //        $"Protection des phrases en langues étrangères ..."
+        //    );
+        //    try
+        //    {
+        //        foreach (MSWord.Range w in _document.Words)
+        //        {
+        //            w.DetectLanguage();
+        //            string text = w.Text;
+        //            isInCode = (text.StartsWith("[[*") || text.EndsWith("[[*")) ? true : (text.EndsWith("*]]") ? false : isInCode);
+        //            if (w.LanguageID != MSWord.WdLanguageID.wdFrench)
+        //            {
+        //                motsEtrangesConsecutifs.Add(w);
+        //            }
+        //            else
+        //            {
+        //                if (motsEtrangesConsecutifs.Count > 1)
+        //                {
+        //                    int startBlock = motsEtrangesConsecutifs.First().Start;
+        //                    int endBlock = motsEtrangesConsecutifs.Last().End;
+        //                    // Ajouter les codes de protection G1 et G2 autour de la phrase étrangère
+        //                    int decalage = 0;
+        //                    MSWord.Range phraseRange = _document.Range(startBlock, endBlock);
+        //                    info?.Invoke(
+        //                        $"Protection du block de texte {phraseRange.Text}"
+        //                    );
+        //                    if (!phraseRange.Text.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1))
+        //                    {
+        //                        phraseRange.InsertBefore(DictionnaireDeTravail.PROTECTION_CODE_G1);
+        //                        endBlock += DictionnaireDeTravail.PROTECTION_CODE_G1.Length;
+        //                        decalage += DictionnaireDeTravail.PROTECTION_CODE_G1.Length;
+        //                    }
+        //                    if (!phraseRange.Text.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2))
+        //                    {
+        //                        phraseRange.InsertAfter(DictionnaireDeTravail.PROTECTION_CODE_G2);
+        //                        endBlock += DictionnaireDeTravail.PROTECTION_CODE_G2.Length;
+        //                        decalage += DictionnaireDeTravail.PROTECTION_CODE_G2.Length;
+        //                    }
+        //                    motsEtrangesConsecutifs.Clear();
+        //                    WorkingDictionnary.SauvegarderAjoutBlocIntegral(
+        //                        startBlock,
+        //                        endBlock,
+        //                        decalage
+        //                    );
+        //                } else if (motsEtrangesConsecutifs.Count == 1) {
+        //                    motsPossiblementEtrangers.Add(
+        //                        new Tuple<int, string>(motsEtrangesConsecutifs.First().Start, motsEtrangesConsecutifs.First().Text.Trim())
+        //                    );
+        //                    motsEtrangesConsecutifs.Clear();
+        //                }
+        //            }
+        //        }
+        //        if (motsEtrangesConsecutifs.Count > 1) {
+        //            // Cas d'une phrase en langue étrangère en fin de document
+        //            // Ajouter les codes de protection G1 et G2 autour de la phrase étrangère
+        //            int startBlock = motsEtrangesConsecutifs.First().Start;
+        //            int endBlock = motsEtrangesConsecutifs.Last().End;
+        //            int decalage = 0;
+        //            MSWord.Range phraseRange = _document.Range(startBlock, endBlock);
+        //            info?.Invoke(
+        //                $"Protection du block de texte {phraseRange.Text}"
+        //            );
+        //            if (!phraseRange.Text.StartsWith(DictionnaireDeTravail.PROTECTION_CODE_G1)) {
+        //                phraseRange.InsertBefore(DictionnaireDeTravail.PROTECTION_CODE_G1);
+        //                endBlock += DictionnaireDeTravail.PROTECTION_CODE_G1.Length;
+        //                decalage += DictionnaireDeTravail.PROTECTION_CODE_G1.Length;
+        //            }
+        //            if (!phraseRange.Text.EndsWith(DictionnaireDeTravail.PROTECTION_CODE_G2)) {
+        //                phraseRange.InsertAfter(DictionnaireDeTravail.PROTECTION_CODE_G2);
+        //                endBlock += DictionnaireDeTravail.PROTECTION_CODE_G2.Length;
+        //                decalage += DictionnaireDeTravail.PROTECTION_CODE_G2.Length;
+        //            }
+        //            motsEtrangesConsecutifs.Clear();
+        //            WorkingDictionnary.SauvegarderAjoutBlocIntegral(
+        //                startBlock,
+        //                endBlock,
+        //                decalage
+        //            ); ;
+        //        } else if (motsEtrangesConsecutifs.Count == 1) {
+        //            // Cas d'un mot en langue étrangère en fin de document
+        //            motsPossiblementEtrangers.Add(
+        //                new Tuple<int, string>(motsEtrangesConsecutifs.First().Start, motsEtrangesConsecutifs.First().Text.Trim())
+        //            );
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        MessageBox.Show(
+        //            "Impossible de procéder à la détection des phrases étrangères : \r\n"
+        //            + e.Message
+        //            + "\r\n"
+        //            + "Veuillez installer une langue de vérification supplémentaire (Options > Langue > Langue de création et de vérification > Ajouter)"
+        //        );
+        //    }
+        //    return motsPossiblementEtrangers;
+        //}
         #endregion
     }
+
+
 }

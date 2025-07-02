@@ -81,17 +81,8 @@ namespace fr.avh.braille.tests
         [DataRow("Braille", true)]
         [DataRow("Brailles", true)]
         [DataRow("Volontées", true)]
-        public void MotsAbregeables(string mot, bool expected)
-        {
-            Console.WriteLine("Détection et syllabes : {0} ", Abreviation.regleAppliquerSur(mot));
-            Assert.AreEqual(
-                expected,
-                Abreviation.EstAbregeable(mot),
-                "Mot:<{0}>",
-                new object[] { mot });
-        }
-
-        [TestMethod]
+        [DataRow("habituel", true)]
+        // Mot non abregeable
         [DataRow("Afghanistan", false)]
         [DataRow("Amnesty", false)]
         [DataRow("Biarritz", false)]
@@ -123,9 +114,11 @@ namespace fr.avh.braille.tests
         [DataRow("Stazione", false)]
         [DataRow("successful", false)]
         [DataRow("Witness", false)]
-        public void MotsNonAbregeables(string mot, bool expected)
+        [DataRow("arestuel", false)]
+        [DataRow("afin", false)]
+        public void TestsReglesAbreviation(string mot, bool expected)
         {
-            Console.WriteLine("Détection et syllabes : {0} ", Abreviation.regleAppliquerSur(mot));
+            Console.WriteLine("Détection et syllabes : {0} ", Abreviation.RegleAppliquerSur(mot));
             Assert.AreEqual(
                 expected,
                 Abreviation.EstAbregeable(mot),
