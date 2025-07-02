@@ -60,19 +60,30 @@ namespace fr.avh.braille.dictionnaire
 
         /// <summary>
         /// Position de debut d'un bloc integral (encadré par des codes g1 et g2)
-        /// (inclus le code G2 si présent)
+        /// (exclure le code G2 si présent)
         /// </summary>
-        public List<int> DebutsBlocsIntegral { get; private set; }
+        public SortedSet<int> DebutsBlocsIntegrals { get; private set; }
 
         /// <summary>
         /// Position de fin d'un bloc integral (encadré par des codes g1 et g2)
-        /// (inclus le code G1 si présent)
+        /// (Exclure le code G1 si présent)
         /// </summary>
-        public List<int> FinsBlocsIntegral { get; private set; }
+        public SortedSet<int> FinsBlocsIntegrals { get; private set; }
 
+        /// <summary>
+        /// Liste des blocs de mots en intégral sous la forme d'un tuple de positions (debut, fin) dans le texte
+        /// Si le bloc n'est pas terminé (bloc allant jusqu'a la fin du document), la fin est -1
+        /// </summary>
         public List<Tuple<int,int>> ListeBlocsIntegral { 
             get {
-                return DebutsBlocsIntegral.Select((debut, index) => new Tuple<int, int>(debut, FinsBlocsIntegral[index])).ToList();
+                return DebutsBlocsIntegrals.Select(
+                    (debut, index) => new Tuple<int, int>(
+                        debut,
+                        index < FinsBlocsIntegrals.Count 
+                            ? FinsBlocsIntegrals.ElementAt(index)
+                            : -1
+                        )
+                    ).OrderBy(t => t.Item1).ToList();
             }
         }
 
@@ -120,8 +131,8 @@ namespace fr.avh.braille.dictionnaire
             CarteMotStatut = new Dictionary<string, Statut>();
             ContextesAvantOccurences = new List<string>();
             ContextesApresOccurences = new List<string>();
-            DebutsBlocsIntegral = new List<int>();
-            FinsBlocsIntegral = new List<int>();
+            DebutsBlocsIntegrals = new SortedSet<int>();
+            FinsBlocsIntegrals = new SortedSet<int>();
         }
 
         #region format DDIC
@@ -444,8 +455,6 @@ namespace fr.avh.braille.dictionnaire
 
         public void RechargerDecisionDe(DictionnaireDeTravail importer)
         {
-            
-
             switch (importer.Format) {
                 case FORMAT.DDIC:
                     // Contient uniquement une cartographie des mots et statuts
@@ -582,11 +591,18 @@ namespace fr.avh.braille.dictionnaire
                     PositionsOccurences[i] += decalageOccurencesSuivantes;
                 }
                 // Et les blocs en intéral
-                for (int i = 0; i < DebutsBlocsIntegral.Count; i++) {
-                    if (DebutsBlocsIntegral[i] > PositionsOccurences[occurence]) {
+                for (int i = 0; i < DebutsBlocsIntegrals.Count; i++) {
+                    if (DebutsBlocsIntegrals.ElementAt(i) > PositionsOccurences[occurence]) {
                         // Si le debut du bloc est après l'occurence, on décale le bloc
-                        DebutsBlocsIntegral[i] += decalageOccurencesSuivantes;
-                        FinsBlocsIntegral[i] += decalageOccurencesSuivantes;
+                        int oldStart = DebutsBlocsIntegrals.ElementAt(i);
+                        DebutsBlocsIntegrals.Remove(oldStart);
+                        DebutsBlocsIntegrals.Add(oldStart + decalageOccurencesSuivantes);
+
+                        int oldEnd = FinsBlocsIntegrals.ElementAt(i);
+                        if(oldEnd != int.MaxValue) {
+                            FinsBlocsIntegrals.Remove(oldEnd);
+                            FinsBlocsIntegrals.Add(oldEnd + decalageOccurencesSuivantes);
+                        }
                     }
                 }
             } 
@@ -613,8 +629,72 @@ namespace fr.avh.braille.dictionnaire
             //        }
             //    }
             //}
-                
         }
+
+        public Tuple<int,int> AjouterBlocIntegral(int debut, int fin = int.MaxValue, bool recalculerOffset = false)
+        {
+            DebutsBlocsIntegrals.Add(debut);
+            FinsBlocsIntegrals.Add(fin);
+            // Tri des blocs par ordre croissant de début
+            
+            if (recalculerOffset) {
+                for(int i = 0; i < Occurences.Count; i++) {
+                    PositionsOccurences[i] +=
+                        (PositionsOccurences[i] >= debut ? PROTECTION_CODE_G1.Length : 0) +
+                        (PositionsOccurences[i] > fin ? PROTECTION_CODE_G2.Length : 0);
+                }
+                for (int i = 0; i < DebutsBlocsIntegrals.Count; i++) {
+                    int oldStart = DebutsBlocsIntegrals.ElementAt(i);
+                    if(oldStart > fin) {
+                        DebutsBlocsIntegrals.Remove(oldStart);
+                        DebutsBlocsIntegrals.Add(oldStart + PROTECTION_CODE_G1.Length + PROTECTION_CODE_G2.Length);
+                    }
+
+                    int oldEnd = FinsBlocsIntegrals.ElementAt(i);
+                    if (oldEnd != int.MaxValue && oldEnd > fin) {
+                        FinsBlocsIntegrals.Remove(oldEnd);
+                        FinsBlocsIntegrals.Add(oldEnd + PROTECTION_CODE_G1.Length + PROTECTION_CODE_G2.Length);
+                    }
+                }
+            }
+            return new Tuple<int, int>(debut, fin);
+        }
+        public Tuple<int, int> SupprimerBlocIntegral(int index, bool recalculerOffset = false)
+        {
+            if (index < 0 || index >= DebutsBlocsIntegrals.Count) {
+                throw new ArgumentOutOfRangeException(nameof(index), "L'index du bloc est hors des limites de la liste.");
+            }
+            int debut = DebutsBlocsIntegrals.ElementAt(index);
+            int fin = FinsBlocsIntegrals.ElementAt(index);
+            if (recalculerOffset) {
+                for (int i = 0; i < Occurences.Count; i++) {
+                    PositionsOccurences[i] -=
+                        (PositionsOccurences[i] >= debut ? PROTECTION_CODE_G1.Length : 0) +
+                        (PositionsOccurences[i] > fin ? PROTECTION_CODE_G2.Length : 0);
+                }
+                for (int i = 0; i < DebutsBlocsIntegrals.Count; i++) {
+                    if(i != index) {
+                        int oldStart = DebutsBlocsIntegrals.ElementAt(i);
+                        if (oldStart > fin) {
+                            DebutsBlocsIntegrals.Remove(oldStart);
+                            DebutsBlocsIntegrals.Add(oldStart - PROTECTION_CODE_G1.Length - PROTECTION_CODE_G2.Length);
+                        }
+
+                        int oldEnd = FinsBlocsIntegrals.ElementAt(i);
+                        if (oldEnd != int.MaxValue && oldEnd > fin) {
+                            FinsBlocsIntegrals.Remove(oldEnd);
+                            FinsBlocsIntegrals.Add(oldEnd - PROTECTION_CODE_G1.Length - PROTECTION_CODE_G2.Length);
+                        }
+                    }
+                }
+            }
+            DebutsBlocsIntegrals.Remove(debut);
+            FinsBlocsIntegrals.Remove(fin);
+            // Renvoi le tuple de la nouvelle position du bloc déprotégé
+            return new Tuple<int, int>(debut - PROTECTION_CODE_G1.Length, fin);
+
+        }
+
 
         /// <summary>
         /// Calcul du statut majoritaire d'un mot dans le dictionnaire de travail
@@ -718,8 +798,8 @@ namespace fr.avh.braille.dictionnaire
             clone.CarteMotOccurences = new Dictionary<string, List<int>>(CarteMotOccurences);
             clone.ContextesAvantOccurences = new List<string>(ContextesAvantOccurences);
             clone.ContextesApresOccurences = new List<string>(ContextesApresOccurences);
-            clone.DebutsBlocsIntegral = new List<int>(DebutsBlocsIntegral);
-            clone.FinsBlocsIntegral = new List<int>(FinsBlocsIntegral);
+            clone.DebutsBlocsIntegrals = new SortedSet<int>(DebutsBlocsIntegrals);
+            clone.FinsBlocsIntegrals = new SortedSet<int>(FinsBlocsIntegrals);
             return clone;
         }
         /// <summary>

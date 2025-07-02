@@ -2534,7 +2534,7 @@ namespace fr.avh.braille.dictionnaire
         public static Regex SearchWord(string pattern, RegexOptions opts)
         {
             return new Regex(
-                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE})?({pattern})(?=[^{ALPHANUM}@'’-]|$)",
+                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?({pattern})({REG_CS}g2{REG_CE})?(?=[^{ALPHANUM}@'’-]|$)",
                 RegexOptions.Compiled | opts
             );
         }
@@ -2568,7 +2568,7 @@ namespace fr.avh.braille.dictionnaire
         /// Expression de recherche de mots (contenant au moins une majuscule ou une minuscule) hors code duxburry
         /// </summary>
         private static readonly Regex WORDS = new Regex(
-                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE})?(?<!{REG_CS})([{ALPHANUM}_-]*[{MIN}{MAJ}][{ALPHANUM}_-]*)(?=[^{ALPHANUM}'’-]|$)",
+                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?(?<!{REG_CS})([{ALPHANUM}_-]*[{MIN}{MAJ}][{ALPHANUM}_-]*)({REG_CS}g2{REG_CE})?(?=[^{ALPHANUM}'’-]|$)",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline
             );
 
@@ -2577,12 +2577,14 @@ namespace fr.avh.braille.dictionnaire
             public string Mot { get; set; }
             public int Index { get; set; }
             public bool EstDejaProteger { get; set; }
+            public bool CommenceUnBlocIntegral { get; set; }
+            public bool TermineUnBlocIntegral { get; set; }
             public bool ContientDesChiffres { get; set; }
             public bool ContientDesMajuscules { get; set; }
             public bool EstAbregeable { get; set; }
             public bool EstFrançaisAbregeable { get; set; }
             public bool EstAmbigu { get; set; }
-            public OccurenceATraiter(string mot, int index, bool estDejaProteger, bool contientDesChiffres = false, bool estAbregeable = false, bool estFrancais = false, bool estAmbigu = false)
+            public OccurenceATraiter(string mot, int index, bool estDejaProteger, bool contientDesChiffres = false, bool estAbregeable = false, bool estFrancais = false, bool estAmbigu = false, bool commenceUnBlocIntegral = false , bool termineUnBlocIntegral = false)
             {
                 Mot = mot;
                 Index = index;
@@ -2592,54 +2594,69 @@ namespace fr.avh.braille.dictionnaire
                 EstAbregeable = estAbregeable;
                 EstFrançaisAbregeable = estFrancais;
                 EstAmbigu = estAmbigu;
+                TermineUnBlocIntegral = termineUnBlocIntegral;
+                CommenceUnBlocIntegral = commenceUnBlocIntegral;
             }
 
 
         }
 
-        public static async Task<Dictionary<int,OccurenceATraiter>> AnalyserTexte(string texteAAnalyser, Utils.OnInfoCallback info = null)
+        public static Dictionary<int,OccurenceATraiter> AnalyserTexte(string texteAAnalyser, Utils.OnInfoCallback info = null)
         {
-            Dictionary<int,OccurenceATraiter> motsAnalyses = new Dictionary<int,OccurenceATraiter>();
-            
-            MatchCollection result = WORDS.Matches(texteAAnalyser);
-            if (result.Count > 0) {
-                info?.Invoke($"Analyse des mots {result.Count} mots du document", new Tuple<int, int>(0, result.Count));
-                List<Task<OccurenceATraiter>> tasks = new List<Task<OccurenceATraiter>>();
-                int i = 1;
-                foreach (Match item in result) {
-                    bool isAlreadyProtected = item.Groups[1].Success;
-                    string foundWord = item.Groups[2].Value.Trim();
-                    int pos = item.Groups[2].Index;
-                    string wordKey = foundWord.ToLower();
-                    tasks.Add(Task.Run(() =>
-                    {
-                        var res = new OccurenceATraiter(foundWord, pos, isAlreadyProtected)
-                        {
-                            ContientDesChiffres = Regex.Match(foundWord, $"[{NUM}]").Success,
-                            ContientDesMajuscules = Regex.Match(foundWord,$"[{MAJ}]").Success,
-                            EstAbregeable = EstAbregeable(wordKey),
-                            EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
-                            EstAmbigu = LexiqueFrance.EstAmbigu(wordKey)
-                        };
+            try {
+                Dictionary<int, OccurenceATraiter> motsAnalyses = new Dictionary<int, OccurenceATraiter>();
+
+                MatchCollection result = WORDS.Matches(texteAAnalyser);
+                if (result.Count > 0) {
+                    info?.Invoke($"Analyse des mots {result.Count} mots du document", new Tuple<int, int>(0, result.Count));
+                    List<Task<OccurenceATraiter>> tasks = new List<Task<OccurenceATraiter>>();
+                    int i = 1;
+                    foreach (Match item in result) {
                         info?.Invoke(
                             "",
                             new Tuple<int, int>(i++, result.Count)
                         );
-                        return res;
-                    }));
-                }
+                        bool isAlreadyProtected = item.Groups[1].Success;
+                        bool commenceUnBlocIntegral = item.Groups[1].Success && item.Groups[1].Value == "[[*g1*]]";
+                        string foundWord = item.Groups[2].Value.Trim();
+                        int pos = item.Groups[2].Index;
+                        bool termineUnBlocIntegral = item.Groups[3].Success && item.Groups[3].Value == "[[*g2*]]";
+                        string wordKey = foundWord.ToLower();
+                        tasks.Add(Task.Run(() => new OccurenceATraiter(foundWord, pos, isAlreadyProtected)
+                        {
+                            ContientDesChiffres = Regex.Match(foundWord, $"[{NUM}]").Success,
+                            ContientDesMajuscules = Regex.Match(foundWord, $"[{MAJ}]").Success,
+                            EstAbregeable = EstAbregeable(wordKey),
+                            EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
+                            EstAmbigu = LexiqueFrance.EstAmbigu(wordKey)
+                        }));
+                    }
 
-                try {
-                    OccurenceATraiter[] tests = await Task.WhenAll(tasks);
-                    foreach (OccurenceATraiter testMot in tests) {
-                        motsAnalyses.Add(testMot.Index, testMot);
+                    try {
+                        i = 1;
+                        info?.Invoke(
+                            "Compilation des résultat de l'analyse"
+                        );
+                        
+                        OccurenceATraiter[] tests = Task.WhenAll(tasks).Result;
+                        foreach (OccurenceATraiter testMot in tests) {
+                            info?.Invoke(
+                                "",
+                                new Tuple<int, int>(i++, result.Count)
+                            );
+                            motsAnalyses.Add(testMot.Index, testMot);
+                        }
+                    }
+                    catch (Exception e) {
+                        throw new Exception("Erreur lors de l'analyse des mots", e);
                     }
                 }
-                catch (Exception e) {
-                    throw new Exception("Erreur lors de l'analyse des mots", e);
-                }
+                return motsAnalyses;
             }
-            return motsAnalyses;
+            catch (AggregateException e) {
+                throw new Exception("Erreur lors de l'analyse du texte", e);
+            }
+            
         }
 
 

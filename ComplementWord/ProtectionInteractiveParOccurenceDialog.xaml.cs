@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using static fr.avh.braille.dictionnaire.Abreviation;
 using Window = System.Windows.Window;
 
 namespace fr.avh.braille.addin
@@ -15,7 +16,7 @@ namespace fr.avh.braille.addin
     /// <summary>
     /// Logique d'interaction pour ProtectionIterativeDialog.xaml
     /// </summary>
-    public partial class ProtectionInteractiveParMotsDialog : Window
+    public partial class ProtectionInteractiveParOccurenceDialog : Window
     {
         ProtectionWord protecteur;
 
@@ -29,6 +30,8 @@ namespace fr.avh.braille.addin
             "Nombre d'occurence dans le document : {0}";
 
         private static readonly string RegleAbreviationTemplate = "Abreviation détecté : {0}";
+
+        private static readonly string ProgressionXSurYTemplate = "Progression : {0} / {1}";
 
         ObservableCollection<MotAfficher> mots = new ObservableCollection<MotAfficher>();
 
@@ -77,12 +80,12 @@ namespace fr.avh.braille.addin
             .ToList();
         }
 
-        public ProtectionInteractiveParMotsDialog(ProtectionWord protecteur)
+        private int _occurenceATraiter = 0;
+
+        public ProtectionInteractiveParOccurenceDialog(ProtectionWord protecteur)
         {
             InitializeComponent();
             this.protecteur = protecteur;
-
-            
             StatusFilter.ItemsSource = SelectionStatus;
 
             //MotsSelectionnable = protecteur.DonneesTraitement.CarteMotOccurences.Keys.ToList();
@@ -95,7 +98,13 @@ namespace fr.avh.braille.addin
 
             // Sélectionner la premiere occurence affiché, ou la premiere occurence du mot si aucune occurrence 
             // ne correspond aux filtres
-            Range next = protecteur.SelectionnerOccurenceMot(protecteur.MotSelectionne, Math.Max(0, selectable));
+            _occurenceATraiter = protecteur.DonneesTraitement.PositionsOccurences.FindIndex(
+                    p => p >= protecteur.PositionCurseur
+                );
+            _occurenceATraiter = _occurenceATraiter >= 0 ? _occurenceATraiter : 0;
+            Range next = protecteur.SelectionnerOccurence(_occurenceATraiter);
+
+            //Range next = protecteur.SelectionnerOccurenceMot(protecteur.MotSelectionne, Math.Max(0, selectable));
             RechargerFenetre();
             next.Select();
         }
@@ -143,7 +152,7 @@ namespace fr.avh.braille.addin
             next.Select();
         }
 
-        private void ProtegerMot_Click(object sender, RoutedEventArgs e)
+        private void ProtegerIci_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(protecteur.MotSelectionne))
             {
@@ -155,7 +164,7 @@ namespace fr.avh.braille.addin
             }
         }
 
-        private void AbregerMot_Click(object sender, RoutedEventArgs e)
+        private void AbregerIci_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrEmpty(protecteur.MotSelectionne))
             {
@@ -169,145 +178,135 @@ namespace fr.avh.braille.addin
 
         private bool _hasFinishedReview = false;
 
-        private void Next_Click(object sender, RoutedEventArgs e)
-        {
-            System.Threading.Tasks.Task.Run(() =>
-            {
-                AppliquerStatuts();
+        //private void Next_Click(object sender, RoutedEventArgs e)
+        //{
+        //    System.Threading.Tasks.Task.Run(() =>
+        //    {
+        //        AppliquerStatuts();
                 
-                Dispatcher.Invoke(() =>
-                {
+        //        Dispatcher.Invoke(() =>
+        //        {
                     
-                    if (
-                        protecteur.MotSelectionne.ToLower()
-                        == protecteur.DonneesTraitement.CarteMotOccurences.Keys.Last()
-                    ) { // Si on est sur le dernier mot
-                        if (!protecteur.EstTerminer()) { // S'il reste des éléments à traiter (pour lesquels un statut n'a pas été choisi)
-                            if (!_hasFinishedReview)
-                            { // Si on est pas déja en mode sélectif
-                                // on averti l'utilisateur qu'il reste des éléments à traiter et que le parcours va repartir de la premiere occurence non traité
-                                MessageBox.Show(
-                                    "Des occurences sans décision sont toujours présentes, le parcours va maintenant se concentrer sur les mots ayant des occurences sans statuts.",
-                                    "Des occurences en statut inconnus sont toujours présentes",
-                                    MessageBoxButton.OK,
-                                    MessageBoxImage.Warning
-                                );
-                                // On change de mode
-                                _hasFinishedReview = true;
-                            }
-                            // Repartir de la premiere occurence et selectionner la première occurence en statut Ignorer
-                            protecteur.SelectionnerOccurence(0);
-                            SelectionProchainMotATraiter(true);
-                        }
-                        else // Si on est sur le dernier mot et qu'il n'y a plus d'occurence à traiter
-                        {
-                            // on averti l'utilisateur qu'il n'y a plus d'occurence à traiter et qu'il peut fermer la fenetre pour terminer le traitement
-                            var message = MessageBox.Show(
-                                "Tous les mots du documents identifiés ont été traités. Voulez-vous fermer la fenêtre de traitement ?",
-                                "Fin de l'analyse",
-                                MessageBoxButton.YesNo,
-                                MessageBoxImage.Question
-                            );
-                            // Désactivation du mode passage en revue sélectif
-                            _hasFinishedReview = false;
-                            if (message == MessageBoxResult.Yes) { // Si l'utilisateur a confirmer vouloir a fermer la fenettre
-                                // On revient au début et on ferme la fenetre
-                                protecteur.SelectionnerOccurence(0);
-                                Dispatcher.Invoke(() => Close());
-                            }
-                            else { // Sinon on passe au mot suivant
-                                SelectionProchainMot();
-                            }
-                        }
-                    }
-                    else
-                    { // Cas général
-                        if (_hasFinishedReview)
-                        { // si on est en mode parcours d'occurences non traité
-                            if (!protecteur.EstTerminer())
-                            {   // s'il reste des occurences non traitées
-                                // Selectionner la prochaine occurence en statut Inconnu
-                                SelectionProchainMotATraiter();
-                            }
-                            else
-                            { // Sinon on a terminé le traitement complet en mode review selected
-                                // on averti l'utilisateur qu'il n'y a plus d'occurence à traiter et qu'il peut fermer la fenetre pour terminer le traitement
-                                var message = MessageBox.Show(
-                                    "Tous les mots du documents identifiés ont été traités. Voulez-vous fermer la fenêtre ?",
-                                    "Fin de l'analyse",
-                                    MessageBoxButton.YesNo,
-                                    MessageBoxImage.Question
-                                );
-                                // Désactivation du mode passage en revue sélectif
-                                _hasFinishedReview = false;
-                                // on revient a la première occurence détectée
-                                var range = protecteur.SelectionnerOccurence(0);
-                                // Si l'utilisateur a demander a fermer la fenettre
-                                if (message == MessageBoxResult.Yes)
-                                {
-                                    Dispatcher.Invoke(() => Close());
-                                }
-                                else
-                                {
-                                    // Sinon on remet en avant le mot et on recharge la fenetre
-                                    range?.Select();
-                                    RechargerFenetre();
-                                }
-                            }
-                        }
-                        else
-                        { // mode normal de traitement sur la première passe, on passe au mot suivant
-                            SelectionProchainMot();
-                        }
-                    }
-                });
-            });
-        }
-
-        private void ProgressHandler(string message, Tuple<int, int> progress)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                ProgressIndicator.Content = message;
-                ProgressAnalyse.Maximum = progress.Item2;
-                ProgressAnalyse.Value = progress.Item1;
-            });
-        }
+        //            if (
+        //                protecteur.SelectedWord.ToLower()
+        //                == protecteur.DonneesTraitement.CarteMotOccurences.Keys.Last()
+        //            ) { // Si on est sur le dernier mot
+        //                if (!protecteur.EstTerminer()) { // S'il reste des éléments à traiter (pour lesquels un statut n'a pas été choisi)
+        //                    if (!_hasFinishedReview)
+        //                    { // Si on est pas déja en mode sélectif
+        //                        // on averti l'utilisateur qu'il reste des éléments à traiter et que le parcours va repartir de la premiere occurence non traité
+        //                        MessageBox.Show(
+        //                            "Des occurences sans décision sont toujours présentes, le parcours va maintenant se concentrer sur les mots ayant des occurences sans statuts.",
+        //                            "Des occurences en statut inconnus sont toujours présentes",
+        //                            MessageBoxButton.OK,
+        //                            MessageBoxImage.Warning
+        //                        );
+        //                        // On change de mode
+        //                        _hasFinishedReview = true;
+        //                    }
+        //                    // Repartir de la premiere occurence et selectionner la première occurence en statut Ignorer
+        //                    protecteur.SelectionnerOccurence(0);
+        //                    SelectionProchainMotATraiter(true);
+        //                }
+        //                else // Si on est sur le dernier mot et qu'il n'y a plus d'occurence à traiter
+        //                {
+        //                    // on averti l'utilisateur qu'il n'y a plus d'occurence à traiter et qu'il peut fermer la fenetre pour terminer le traitement
+        //                    var message = MessageBox.Show(
+        //                        "Tous les mots du documents identifiés ont été traités. Voulez-vous fermer la fenêtre de traitement ?",
+        //                        "Fin de l'analyse",
+        //                        MessageBoxButton.YesNo,
+        //                        MessageBoxImage.Question
+        //                    );
+        //                    // Désactivation du mode passage en revue sélectif
+        //                    _hasFinishedReview = false;
+        //                    if (message == MessageBoxResult.Yes) { // Si l'utilisateur a confirmer vouloir a fermer la fenettre
+        //                        // On revient au début et on ferme la fenetre
+        //                        protecteur.SelectionnerOccurence(0);
+        //                        Dispatcher.Invoke(() => Close());
+        //                    }
+        //                    else { // Sinon on passe au mot suivant
+        //                        SelectionProchainMot();
+        //                    }
+        //                }
+        //            }
+        //            else
+        //            { // Cas général
+        //                if (_hasFinishedReview)
+        //                { // si on est en mode parcours d'occurences non traité
+        //                    if (!protecteur.EstTerminer())
+        //                    {   // s'il reste des occurences non traitées
+        //                        // Selectionner la prochaine occurence en statut Inconnu
+        //                        SelectionProchainMotATraiter();
+        //                    }
+        //                    else
+        //                    { // Sinon on a terminé le traitement complet en mode review selected
+        //                        // on averti l'utilisateur qu'il n'y a plus d'occurence à traiter et qu'il peut fermer la fenetre pour terminer le traitement
+        //                        var message = MessageBox.Show(
+        //                            "Tous les mots du documents identifiés ont été traités. Voulez-vous fermer la fenêtre ?",
+        //                            "Fin de l'analyse",
+        //                            MessageBoxButton.YesNo,
+        //                            MessageBoxImage.Question
+        //                        );
+        //                        // Désactivation du mode passage en revue sélectif
+        //                        _hasFinishedReview = false;
+        //                        // on revient a la première occurence détectée
+        //                        var range = protecteur.SelectionnerOccurence(0);
+        //                        // Si l'utilisateur a demander a fermer la fenettre
+        //                        if (message == MessageBoxResult.Yes)
+        //                        {
+        //                            Dispatcher.Invoke(() => Close());
+        //                        }
+        //                        else
+        //                        {
+        //                            // Sinon on remet en avant le mot et on recharge la fenetre
+        //                            range?.Select();
+        //                            RechargerFenetre();
+        //                        }
+        //                    }
+        //                }
+        //                else
+        //                { // mode normal de traitement sur la première passe, on passe au mot suivant
+        //                    SelectionProchainMot();
+        //                }
+        //            }
+        //        });
+        //    });
+        //}
 
         /// <summary>
         /// Appliquer les statuts sur les occurences du mot sélectionné
         /// </summary>
-        private void AppliquerStatuts()
-        {
-            string mot = protecteur.MotSelectionne;
-            List<int> occurences = protecteur.DonneesTraitement.CarteMotOccurences[
-                    protecteur.MotSelectionne
-                ].Where(
-                    i => protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.ABREGE 
-                        || protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.PROTEGE
-                        || protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.IGNORE
-                ).ToList();
-            Dispatcher.Invoke(() =>
-            {
-                ProgressAnalyse.Maximum = occurences.Count;
-                ProgressAnalyse.Value = 0;
-            });
+        //private void AppliquerStatuts()
+        //{
+        //    string mot = protecteur.SelectedWord;
+        //    List<int> occurences = protecteur.DonneesTraitement.CarteMotOccurences[
+        //            protecteur.SelectedWord
+        //        ].Where(
+        //            i => protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.ABREGE 
+        //                || protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.PROTEGE
+        //                || protecteur.DonneesTraitement.StatutsOccurences[i] == Statut.IGNORE
+        //        ).ToList();
+        //    Dispatcher.Invoke(() =>
+        //    {
+        //        ProgressAnalyse.Maximum = occurences.Count;
+        //        ProgressAnalyse.Value = 0;
+        //    });
 
 
-            for(int i = 0; i < occurences.Count; i++) {
-                protecteur.SelectionnerOccurenceMot(mot, i).Select();
-                protecteur.AppliquerStatutSurOccurence(protecteur.Occurence, protecteur.StatutOccurence);
+        //    for(int i = 0; i < occurences.Count; i++) {
+        //        protecteur.SelectionnerOccurenceMot(mot, i).Select();
+        //        protecteur.AppliquerStatutSurOccurence(protecteur.SelectedOccurence, protecteur.SelectedOccurenceStatut);
 
-                Dispatcher.Invoke(() =>
-                {
-                    ProgressAnalyse.Value = i+1;
-                    ProgressIndicator.Content =
-                        $"{ProgressAnalyse.Value} / {ProgressAnalyse.Maximum}";
-                    this.UpdateLayout();
-                });
-            }
-            protecteur.ChargerTexteEnMemoire();
-        }
+        //        Dispatcher.Invoke(() =>
+        //        {
+        //            ProgressAnalyse.Value = i+1;
+        //            ProgressIndicator.Content =
+        //                $"{ProgressAnalyse.Value} / {ProgressAnalyse.Maximum}";
+        //            this.UpdateLayout();
+        //        });
+        //    }
+        //    protecteur.ChargerTexteEnMemoire();
+        //}
 
         private void Previous_Click(object sender, RoutedEventArgs e)
         {
@@ -373,7 +372,7 @@ namespace fr.avh.braille.addin
         {
             protecteur.SelectedRange.Select();
             Title = string.Format(dialogTitleTemplate, protecteur.MotSelectionne);
-            Previous.IsEnabled = protecteur.Occurence > 0;
+            //Previous.IsEnabled = protecteur.SelectedOccurence > 0;
             
             MotSelectionne.Content = string.Format(MotSelectionneTemplate, protecteur.MotSelectionne);
             int motsUniquesTraites = protecteur.DonneesTraitement.CarteMotOccurences.Keys
@@ -381,9 +380,9 @@ namespace fr.avh.braille.addin
                 .IndexOf(protecteur.MotSelectionne);
 
             MotsSelectionnable = protecteur.DonneesTraitement.CarteMotOccurences.Keys.OrderBy(k => k).ToList();
-            SelecteurMot.ItemsSource = MotsSelectionnable;
+            //SelecteurMot.ItemsSource = MotsSelectionnable;
             _indexDuMotSelectionner = MotsSelectionnable.IndexOf(protecteur.MotSelectionne);
-            SelecteurMot.SelectedIndex = _indexDuMotSelectionner;
+            //SelecteurMot.SelectedIndex = _indexDuMotSelectionner;
 
             
            MotsSelectionnablesOrdonnes = protecteur.DonneesTraitement.CarteMotOccurences.Keys.OrderBy(
@@ -399,12 +398,12 @@ namespace fr.avh.braille.addin
                         ];
                     }
             ).ToList();
-            MotDansOrdreDocument.ItemsSource = MotsSelectionnablesOrdonnes.Select((s, i) => $"{s} - {i+1}");
+            //MotDansOrdreDocument.ItemsSource = MotsSelectionnablesOrdonnes.Select((s, i) => $"{s} - {i+1}");
             _indexDuMotSelectionnerDansLordre = MotsSelectionnablesOrdonnes.IndexOf(protecteur.MotSelectionne);
-            MotDansOrdreDocument.SelectedIndex = _indexDuMotSelectionnerDansLordre;
+            //MotDansOrdreDocument.SelectedIndex = _indexDuMotSelectionnerDansLordre;
 
-            Total.Content = string.Format(
-                "/ {0}", MotsSelectionnablesOrdonnes.Count
+            ProgressionXSurY.Content = string.Format(
+                ProgressionXSurYTemplate, protecteur.Occurence + 1, protecteur.DonneesTraitement.Occurences.Count
             );
 
             NbOccurence.Content = string.Format(
@@ -453,8 +452,8 @@ namespace fr.avh.braille.addin
                 CommentairesMot.Content = "Le mot n'existe pas dans la base de donnée";
             }
             VueDictionnaire_Refresh();
-            ProgressAnalyse.Value = 0;
-            ProgressIndicator.Content = null;
+            //ProgressAnalyse.Value = 0;
+            //ProgressIndicator.Content = null;
             _hasChanged = false;
         }
 
@@ -510,21 +509,6 @@ namespace fr.avh.braille.addin
             VueDictionnaire_Refresh();
         }
 
-        private void SelecteurMot_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (
-                SelecteurMot.SelectedIndex >= 0
-                && _indexDuMotSelectionner != SelecteurMot.SelectedIndex
-            )
-            {
-                _indexDuMotSelectionner = SelecteurMot.SelectedIndex;
-                // TODO : charge le mot sélectionné ici dans la fenêtre
-                string mot = SelecteurMot.SelectedValue.ToString();
-                var range = protecteur.SelectionnerOccurenceMot(mot);
-                range?.Select();
-                RechargerFenetre();
-            }
-        }
 
         private void Supprimer_Click(object sender, RoutedEventArgs e)
         {
@@ -548,19 +532,98 @@ namespace fr.avh.braille.addin
             }
         }
 
-        private void Progression_SelectionChanged(object sender, SelectionChangedEventArgs e)
+
+        private void AppliquerDecisionEtPasserAOccurenceSuivante(Statut selectionne, bool surtoutesLesOccurences)
         {
-            if (
-                MotDansOrdreDocument.SelectedIndex >= 0
-                && _indexDuMotSelectionnerDansLordre != MotDansOrdreDocument.SelectedIndex
-            ) {
-                _indexDuMotSelectionnerDansLordre = MotDansOrdreDocument.SelectedIndex;
-                // TODO : charge le mot sélectionné ici dans la fenêtre
-                string mot = MotsSelectionnablesOrdonnes[MotDansOrdreDocument.SelectedIndex];
-                var range = protecteur.SelectionnerOccurenceMot(mot);
-                range?.Select();
-                RechargerFenetre();
+            bool hasNext = _occurenceATraiter < protecteur.DonneesTraitement.Occurences.Count - 1;
+            Range selection = protecteur.SelectionnerOccurence(_occurenceATraiter);
+            //selection.Select();
+            if (surtoutesLesOccurences) {
+                int currentOccurence = _occurenceATraiter;
+                string wordKey = protecteur.DonneesTraitement.Occurences[currentOccurence].ToLower().Trim();
+                foreach (int occurence in protecteur.DonneesTraitement.CarteMotOccurences[wordKey]) {
+                    if(occurence <= currentOccurence) {
+                        protecteur.AppliquerStatutSurOccurence(occurence, selectionne);
+                    } else {
+                        // Premarquer les occurence suivantes sans appliquer le statut
+                        protecteur.DonneesTraitement.StatutsOccurences[occurence] = selectionne;
+                    }
+                }
+            } else { 
+                protecteur.AppliquerStatutSurOccurence(_occurenceATraiter, selectionne);
             }
+            selection = protecteur.SelectionnerOccurence(_occurenceATraiter);
+            //selection.Select();
+            if (hasNext) {
+                do {
+                    _occurenceATraiter = protecteur.Occurence + 1;
+                    selection = protecteur.SelectionnerOccurence(_occurenceATraiter);
+                    if( new Statut[] { Statut.PROTEGE, Statut.ABREGE }.Contains(protecteur.StatutOccurence)) {
+                        // l'occurence a été marqué mais n'a pas été préalablement traité
+                        if (!protecteur.OccurenceEstTraitee) {
+                            protecteur.AppliquerStatutSurOccurence(protecteur.Occurence, protecteur.StatutOccurence);
+                        }
+                        hasNext = _occurenceATraiter < protecteur.DonneesTraitement.Occurences.Count - 1;
+                    } else {
+                        // l'occurence n'a pas été pré-marqué ou a été précédement ignorer, on passe au traitement de l'occurence sélectionné
+                        hasNext = false;
+                    }
+                } while (hasNext);
+                protecteur.ChargerTexteEnMemoire();
+                selection = protecteur.SelectionnerOccurence(_occurenceATraiter);
+                RechargerFenetre();
+                selection.Select();
+            } else {
+                int firstIgnore = protecteur.DonneesTraitement.StatutsOccurences.IndexOf(
+                    Statut.IGNORE
+                );
+                if(firstIgnore >= 0) {
+                    // Si on a des occurences ignorées, on repart de la première occurence ignorée
+                    selection = protecteur.SelectionnerOccurence(firstIgnore);
+                    _occurenceATraiter = firstIgnore;
+                    RechargerFenetre();
+                    selection.Select();
+                } else {
+                    MessageBox.Show(
+                        "Tous les mots identifiés a partir de votre sélection de départ ont été traités",
+                        "Fin du traitement",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information
+                    );
+                    this.Close();
+                }
+            }
+
+        }
+
+        private void IgnorerOccurence_Click(object sender, RoutedEventArgs e)
+        {
+            AppliquerDecisionEtPasserAOccurenceSuivante(Statut.IGNORE, false);
+        }
+
+        private void ProtegerOccurence_Click(object sender, RoutedEventArgs e)
+        {
+            AppliquerDecisionEtPasserAOccurenceSuivante(Statut.PROTEGE, false);
+        }
+
+        private void ProtegerMot_Click(object sender, RoutedEventArgs e)
+        {
+            AppliquerDecisionEtPasserAOccurenceSuivante(Statut.PROTEGE, true);
+        }
+
+        private void AbregerMot_Click(object sender, RoutedEventArgs e)
+        {
+            AppliquerDecisionEtPasserAOccurenceSuivante(Statut.ABREGE, true);
+        }
+
+        private void AbregerOccurence_Click(object sender, RoutedEventArgs e)
+        {
+            AppliquerDecisionEtPasserAOccurenceSuivante(Statut.ABREGE, false);
+        }
+
+        private void Reselectionner_Click(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

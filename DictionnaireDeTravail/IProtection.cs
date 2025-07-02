@@ -29,7 +29,7 @@ namespace fr.avh.braille.dictionnaire
         /// <param name="start"></param>
         /// <param name="end"></param>
         /// <param name="statut"></param>
-        void AppliquerStatutSurBlock(int start, int end, Statut statut);
+        //void AppliquerStatutSurBlock(int start, int end, Statut statut);
 
         void AfficherOccurence(int index);
 
