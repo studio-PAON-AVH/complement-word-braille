@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using System.IO;
 using System.Text;
 using System.Windows;
+using fr.avh.braille.dictionnaire;
 
 namespace fr.avh.braille.addin
 {
@@ -129,6 +130,9 @@ namespace fr.avh.braille.addin
 
         private void ThisAddIn_Startup(object sender, System.EventArgs e)
         {
+            // DIRTY FIX : en attendant de trouver un moyen plus clean de mettre a jour la base de donnée
+            // On la redéploie a chaque lancement du complement (la base fait 30 mega donc pas un gros impact)
+            BaseSQlite.Redeploy();
             AddinUpdater.CheckForUpdate();
             // Pour plus tard : remplacer la fenêtre du journal pas un task pane qui hébergera le calcul pour le document courant
             // 

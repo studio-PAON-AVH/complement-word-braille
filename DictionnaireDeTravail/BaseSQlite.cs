@@ -30,6 +30,29 @@ namespace fr.avh.braille.dictionnaire
             return File.Exists(Path.Combine(Globals.AppData.FullName, dbFilename));
         }
 
+        public static void Redeploy()
+        {
+            if(dbExists()) {
+                try {
+                    File.Delete(Path.Combine(Globals.AppData.FullName, dbFilename));
+                }
+                catch (Exception e) {
+                    //return;
+                }
+            }
+            lock (dbFilename) {
+                try {
+                    byte[] rawDb = Properties.Resources.protection;
+                    File.WriteAllBytes(Path.Combine(Globals.AppData.FullName, dbFilename), rawDb);
+                    //onInfo?.Invoke("La base de donnée locale est installé");
+                }
+                catch (Exception e1) {
+                    //onInfo?.Invoke($"Impossible d'installer la base de donnée locale: {e1.Message}");
+                    //onInfo?.Invoke("Essai d'installation depuis le dépot distant");
+                }
+            }
+        }
+
         public static void CheckForUpdates(
             OnInfoCallback onInfo = null
         )
