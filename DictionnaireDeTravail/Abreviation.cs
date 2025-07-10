@@ -2531,11 +2531,11 @@ namespace fr.avh.braille.dictionnaire
         /// - Group 1 : Code de protection optionnel
         /// - Group 2 : Motif détecté
         /// </returns>
-        public static Regex SearchWord(string pattern, RegexOptions opts)
+        public static Regex SearchWord(string pattern)
         {
             return new Regex(
-                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?({pattern})({REG_CS}g2{REG_CE})?(?=[^{ALPHANUM}@'’-]|$)",
-                RegexOptions.Compiled | opts
+                $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?(?<!{REG_CS})({pattern})({REG_CS}g2{REG_CE})?(?=[^{ALPHANUM}'’-]|$)",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline
             );
         }
 
@@ -2571,6 +2571,42 @@ namespace fr.avh.braille.dictionnaire
                 $"(?<=[^{ALPHANUM}-]|^)({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?(?<!{REG_CS})([{ALPHANUM}_-]*[{MIN}{MAJ}][{ALPHANUM}_-]*)({REG_CS}g2{REG_CE})?(?=[^{ALPHANUM}'’-]|$)",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline
             );
+        public static readonly Regex WORDSMAJNUM = new Regex(
+            $"(?<=[^{ALPHANUM}-]|^)" +
+            $"({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?" + // prefix de protection (mot ou bloc)
+            $"(?<!{REG_CS})" +
+            $"([{ALPHANUM}_-]*" +
+                $"([{MIN}{MAJ}]+[{MAJ}{NUM}]|[{MAJ}{NUM}][{MIN}{MAJ}]+)" +
+            $"[{ALPHANUM}_-]*)" +
+            $"({REG_CS}g2{REG_CE})?" + // suffix de protection de bloc
+            $"(?=[^{ALPHANUM}'’-]|$)",
+                RegexOptions.Compiled | RegexOptions.Singleline
+            );
+
+        public static readonly Regex WORDSNUM = new Regex(
+            $"(?<=[^{ALPHANUM}-]|^)" +
+            $"({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?" + // prefix de protection (mot ou bloc)
+            $"(?<!{REG_CS})" +
+            $"([{ALPHANUM}_-]*" +
+                $"([{MIN}{MAJ}]+[{NUM}]|[{NUM}][{MIN}{MAJ}]+)" +
+            $"[{ALPHANUM}_-]*)" +
+            $"({REG_CS}g2{REG_CE})?" + // suffix de protection de bloc
+            $"(?=[^{ALPHANUM}'’-]|$)",
+                RegexOptions.Compiled | RegexOptions.Singleline
+            );
+
+        public static readonly Regex WORDSMAJ = new Regex(
+           $"(?<=[^{ALPHANUM}-]|^)" +
+           $"({REG_CS}i{REG_CE}|{REG_CS}g1{REG_CE})?" + // prefix de protection (mot ou bloc)
+           $"(?<!{REG_CS})" +
+           $"([{ALPHANUM}_-]*" +
+               $"([{MIN}{MAJ}]+[{MAJ}]|[{MAJ}][{MIN}{MAJ}]+)" +
+           $"[{ALPHANUM}_-]*)" +
+           $"({REG_CS}g2{REG_CE})?" + // suffix de protection de bloc
+           $"(?=[^{ALPHANUM}'’-]|$)",
+               RegexOptions.Compiled | RegexOptions.Singleline
+           );
+
 
         public class OccurenceATraiter
         {
@@ -2582,8 +2618,14 @@ namespace fr.avh.braille.dictionnaire
             public bool ContientDesChiffres { get; set; }
             public bool ContientDesMajuscules { get; set; }
             public bool EstAbregeable { get; set; }
-            public bool EstFrançaisAbregeable { get; set; }
-            public bool EstAmbigu { get; set; }
+
+            public string ContexteAvant { get; set; } = "";
+
+            public string ContexteApres { get; set; } = "";
+
+            public bool EstFrançaisAbregeable { get; set; } = false;
+
+            public bool EstAmbigu { get; set; } = false;
             public OccurenceATraiter(string mot, int index, bool estDejaProteger, bool contientDesChiffres = false, bool estAbregeable = false, bool estFrancais = false, bool estAmbigu = false, bool commenceUnBlocIntegral = false , bool termineUnBlocIntegral = false)
             {
                 Mot = mot;
@@ -2592,8 +2634,8 @@ namespace fr.avh.braille.dictionnaire
                 ContientDesMajuscules = contientDesChiffres;
                 EstDejaProteger = estDejaProteger;
                 EstAbregeable = estAbregeable;
-                EstFrançaisAbregeable = estFrancais;
-                EstAmbigu = estAmbigu;
+                //EstFrançaisAbregeable = estFrancais;
+                //EstAmbigu = estAmbigu;
                 TermineUnBlocIntegral = termineUnBlocIntegral;
                 CommenceUnBlocIntegral = commenceUnBlocIntegral;
             }
@@ -2601,7 +2643,16 @@ namespace fr.avh.braille.dictionnaire
 
         }
 
-        public static Dictionary<int,OccurenceATraiter> AnalyserTexte(string texteAAnalyser, Utils.OnInfoCallback info = null)
+        /// <summary>
+        /// Analyse complete du texte du document <br/>
+        /// Juger trop long par les transcripteurs, doit revenir a la détection des seuls mots avec chiffres ou majuscules <br/>
+        /// 
+        /// </summary>
+        /// <param name="texteAAnalyser"></param>
+        /// <param name="info"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public static Dictionary<int,OccurenceATraiter> AnalyserTexteComplet(string texteAAnalyser, Utils.OnInfoCallback info = null)
         {
             try {
                 Dictionary<int, OccurenceATraiter> motsAnalyses = new Dictionary<int, OccurenceATraiter>();
@@ -2659,10 +2710,108 @@ namespace fr.avh.braille.dictionnaire
             
         }
 
+        public static Dictionary<int, OccurenceATraiter> RechercheMotsAvecChiffres(string texteAAnalyser, Utils.OnInfoCallback info = null)
+        {
+            try {
+                Dictionary<int, OccurenceATraiter> motsAnalyses = new Dictionary<int, OccurenceATraiter>();
+                info?.Invoke($"Recherche des mots contenant des chiffres", new Tuple<int, int>(0, 0));
 
-        // TODO : pour limiter le temps de traitement, plutot que de passer 2 fois sur la liste des mots identifiés,
-        // récupérer en un seul traitement sur chaque mot si le mot est un mot ambigu ou hors lexique
+                MatchCollection result = WORDSNUM.Matches(texteAAnalyser);
+                if (result.Count > 0) {
+                    info?.Invoke($"Récupérations des {result.Count} mots détectés", new Tuple<int, int>(0, result.Count));
+                    int i = 1;
+                    foreach (Match item in result) {
+                        info?.Invoke(
+                            "",
+                            new Tuple<int, int>(i++, result.Count)
+                        );
+                        bool isAlreadyProtected = item.Groups[1].Success;
+                        bool commenceUnBlocIntegral = item.Groups[1].Success && item.Groups[1].Value == "[[*g1*]]";
+                        string foundWord = item.Groups[2].Value.Trim();
+                        int pos = item.Groups[2].Index;
+                        bool termineUnBlocIntegral = item.Groups[3].Success && item.Groups[3].Value == "[[*g2*]]";
+                        string wordKey = foundWord.ToLower();
 
+                        motsAnalyses[pos] = new OccurenceATraiter(foundWord, pos, isAlreadyProtected)
+                        {
+                            ContientDesChiffres = true,
+                            ContientDesMajuscules = false,
+                            EstAbregeable = false,
+                            //EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
+                            //EstAmbigu = LexiqueFrance.EstAmbigu(wordKey)
+                            CommenceUnBlocIntegral = commenceUnBlocIntegral,
+                            TermineUnBlocIntegral = termineUnBlocIntegral
+                        };
+                    }
+                }
+
+                return motsAnalyses;
+            }
+            catch (AggregateException e) {
+                throw new Exception("Erreur lors de l'analyse du texte", e);
+            }
+        }
+        public static List<Task<OccurenceATraiter>> RechercheMotsAvecMaj(string texteAAnalyser, Utils.OnInfoCallback info = null)
+        {
+            try {
+                List<Task<OccurenceATraiter>> motsAnalyses = new List<Task<OccurenceATraiter>>();
+                info?.Invoke($"Recherche des mots contenant des majuscules...", new Tuple<int, int>(0, 0));
+
+                MatchCollection result = WORDSMAJ.Matches(texteAAnalyser);
+                if (result.Count > 0) {
+                    info?.Invoke($"Lancement des taches d'analyse des {result.Count} mots détectés", new Tuple<int, int>(0, result.Count));
+                    int i = 1;
+                    foreach (Match item in result) {
+                        info?.Invoke(
+                            "",
+                            new Tuple<int, int>(i++, result.Count)
+                        );
+                        bool isAlreadyProtected = item.Groups[1].Success;
+                        bool commenceUnBlocIntegral = item.Groups[1].Success && item.Groups[1].Value == "[[*g1*]]";
+                        string foundWord = item.Groups[2].Value.Trim();
+                        int pos = item.Groups[2].Index;
+                        bool termineUnBlocIntegral = item.Groups[3].Success && item.Groups[3].Value == "[[*g2*]]";
+                        string wordKey = foundWord.ToLower();
+                        // Récupération du contexte autour de l'occurence
+                        int indexBefore = Math.Max(0, pos - 50);
+                        int indexAfter = Math.Min(
+                            texteAAnalyser.Length - 1,
+                            pos + foundWord.Length + 50
+                        );
+                        string contextBefore = texteAAnalyser.Substring(
+                            indexBefore,
+                            pos - indexBefore
+                        );
+                        string contextAfter = "";
+
+                        contextAfter = texteAAnalyser.Substring(
+                            pos + foundWord.Length,
+                            indexAfter - foundWord.Length - pos
+                        );
+
+                        motsAnalyses.Add(Task.Run(() => new OccurenceATraiter(foundWord, pos, isAlreadyProtected)
+                        {
+                            ContientDesChiffres = false,
+                            ContientDesMajuscules = true,
+                            EstAbregeable = EstAbregeable(wordKey),
+                            //EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
+                            //EstAmbigu = LexiqueFrance.EstAmbigu(wordKey)
+                            CommenceUnBlocIntegral = commenceUnBlocIntegral,
+                            TermineUnBlocIntegral = termineUnBlocIntegral,
+                            ContexteAvant = contextBefore,
+                            ContexteApres = contextAfter
+                        }));
+                    }
+                }
+
+                return motsAnalyses;
+            }
+            catch (AggregateException e) {
+                throw new Exception("Erreur lors de l'analyse du texte", e);
+            }
+        }
+
+       
         #endregion
 
 

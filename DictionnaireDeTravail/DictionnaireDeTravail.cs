@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
+using static fr.avh.braille.dictionnaire.Abreviation;
 
 namespace fr.avh.braille.dictionnaire
 {
@@ -46,7 +47,7 @@ namespace fr.avh.braille.dictionnaire
         ///     ou si statut abrégé ou ignorer sans code devant l'occurence
         /// )
         /// </summary>
-        public List<bool> StatutsAppliquer { get; private set; }
+        public List<bool> EstTraitee { get; private set; }
 
         /// <summary>
         /// Liste des contextes avant les occurences
@@ -126,7 +127,7 @@ namespace fr.avh.braille.dictionnaire
             Occurences = new List<string>();
             PositionsOccurences = new List<int>();
             StatutsOccurences = new List<Statut>();
-            StatutsAppliquer = new List<bool>();
+            EstTraitee = new List<bool>();
             CarteMotOccurences = new Dictionary<string, List<int>>();
             CarteMotStatut = new Dictionary<string, Statut>();
             ContextesAvantOccurences = new List<string>();
@@ -423,17 +424,17 @@ namespace fr.avh.braille.dictionnaire
                     {
                         // Calculer le statut le plus fréquent
                         var statutFrequent = kvp.Value
-                            .GroupBy(index => StatutsOccurences[index])
+                            .GroupBy(index => EstTraitee[index] ? StatutsOccurences[index] : Statut.INCONNU)
                             .OrderByDescending(group => group.Count())
                             .First()
                             .Key;
 
                         // Créer un dictionnaire des occurences en excluant les occurences avec le statut le plus fréquent
                         var occurences = kvp.Value
-                        .Where(index => StatutsOccurences[index] != statutFrequent)
+                        .Where(index => (EstTraitee[index] ? StatutsOccurences[index] : Statut.INCONNU) != statutFrequent)
                         .ToDictionary(
                             index => kvp.Value.IndexOf(index).ToString(),
-                            index => (int)StatutsOccurences[index]
+                            index => EstTraitee[index] ? (int)StatutsOccurences[index] : (int)Statut.INCONNU
                         );
 
                         return new MotJson { statut = (int)statutFrequent, nb_occurences = kvp.Value.Count, occurences = occurences };
@@ -465,7 +466,12 @@ namespace fr.avh.braille.dictionnaire
                         if (CarteMotOccurences.ContainsKey(mot)) {
                             // On rappatrie le statut sur toutes les occurences du mot
                             foreach (var occurenceMot in CarteMotOccurences[mot]) {
-                                StatutsOccurences[occurenceMot] = statut;
+                                Statut newStat = CarteMotStatut[mot];
+                                // changement de statut au rechargement : occurence a retraité si elle l'etait deja
+                                if (newStat != StatutsOccurences[occurenceMot]) {
+                                    EstTraitee[occurenceMot] = false;
+                                }
+                                StatutsOccurences[occurenceMot] = newStat;
                             }
                         }
                     }
@@ -486,14 +492,24 @@ namespace fr.avh.braille.dictionnaire
                                 if (CarteMotStatut[mot] != Statut.INCONNU) {
                                     // On rappatrie le statut sur toutes les occurences du mot
                                     foreach (var occurenceMot in CarteMotOccurences[mot]) {
-                                        StatutsOccurences[occurenceMot] = CarteMotStatut[mot];
+                                        Statut newStat = CarteMotStatut[mot];
+                                        // changement de statut au rechargement : occurence a retraité si elle l'etait deja
+                                        if (newStat != StatutsOccurences[occurenceMot]) {
+                                            EstTraitee[occurenceMot] = false;
+                                        }
+                                        StatutsOccurences[occurenceMot] = newStat;
                                     }
                                 } else {
                                     // On rappatrie les décisions spécifiques de chaque occurence 
                                     for (int i = 0; i < srcOccurences.Count; i++) {
                                         List<int> target = CarteMotOccurences[mot];
                                         if (i < target.Count) {
-                                            StatutsOccurences[target[i]] = importer.StatutsOccurences[srcOccurences[i]];
+                                            Statut newStat = importer.StatutsOccurences[srcOccurences[i]];
+                                            // changement de statut au rechargement : occurence a retraité
+                                            if (newStat != StatutsOccurences[target[i]]) {
+                                                EstTraitee[target[i]] = false;
+                                            }
+                                            StatutsOccurences[target[i]] = newStat;
                                         } else {
                                             // Plus d'occurence dans le nouveau dictionnaire
                                             break;
@@ -511,6 +527,10 @@ namespace fr.avh.braille.dictionnaire
                                 if (temp.Value != Statut.INCONNU) {
                                     // On rappatrie le statut sur toutes les occurences du mot
                                     foreach (var occurenceMot in CarteMotOccurences[mot]) {
+                                        // changement de statut au rechargement : occurence a retraité
+                                        if (temp.Value != StatutsOccurences[occurenceMot]) {
+                                            EstTraitee[occurenceMot] = false;
+                                        }
                                         StatutsOccurences[occurenceMot] = temp.Value;
                                     }
                                 }
@@ -530,13 +550,23 @@ namespace fr.avh.braille.dictionnaire
                                 if (CarteMotStatut[mot] != Statut.INCONNU) {
                                     // On rappatrie le statut sur toutes les occurences du mot
                                     foreach (var occurenceMot in CarteMotOccurences[mot]) {
-                                        StatutsOccurences[occurenceMot] = CarteMotStatut[mot];
+                                        Statut newStat = CarteMotStatut[mot];
+                                        // changement de statut au rechargement : occurence a retraité
+                                        if(newStat != StatutsOccurences[occurenceMot]) {
+                                            EstTraitee[occurenceMot] = false;
+                                        }
+                                        StatutsOccurences[occurenceMot] = newStat;
                                     }
                                 } else {
                                     // On rappatrie les décisions spécifiques de chaque occurence 
                                     for (int i = 0; i < srcOccurences.Count; i++) {
                                         List<int> target = CarteMotOccurences[mot];
                                         if (i < target.Count) {
+                                            Statut newStat = importer.StatutsOccurences[srcOccurences[i]];
+                                            // changement de statut au rechargement : occurence a retraité
+                                            if (newStat != StatutsOccurences[target[i]]) {
+                                                EstTraitee[target[i]] = false;
+                                            }
                                             StatutsOccurences[target[i]] = importer.StatutsOccurences[srcOccurences[i]];
                                         }
                                     }
@@ -552,6 +582,10 @@ namespace fr.avh.braille.dictionnaire
                                 if (temp.Value != Statut.INCONNU) {
                                     // On rappatrie le statut sur toutes les occurences du mot
                                     foreach (var occurenceMot in CarteMotOccurences[mot]) {
+                                        // changement de statut au rechargement : occurence a retraité
+                                        if (temp.Value != StatutsOccurences[occurenceMot]) {
+                                            EstTraitee[occurenceMot] = false;
+                                        }
                                         StatutsOccurences[occurenceMot] = temp.Value;
                                     }
                                 }
@@ -567,22 +601,22 @@ namespace fr.avh.braille.dictionnaire
 
 
         /// <summary>
-        /// 
+        /// Appliquer un statut sur une occurence dans le dictionnaire de decision
         /// </summary>
-        /// <param name="occurence"></param>
-        /// <param name="statut"></param>
-        /// <param name="decalageAvant"></param>
-        /// <param name="decalageApres"></param>
+        /// <param name="occurence">indice de l'occurence</param>
+        /// <param name="statut">Statut a appliquer</param>
+        /// <param name="decalageAvant">Decalage a ajouter a l'occurence</param>
+        /// <param name="decalageApres">Decalage supplementaire a ajouter aux occurences suivante (decalageFinale = decalageAvant + decalageApres)</param>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         public void AppliquerStatut(int occurence, Statut statut, int decalageAvant = int.MinValue, int decalageApres = int.MinValue)
         {
             if (occurence < 0 || occurence >= StatutsOccurences.Count) {
                 throw new ArgumentOutOfRangeException(nameof(occurence), "L'index d'occurence est hors des limites de la liste.");
             }
-            var previous = StatutsAppliquer[occurence] ? StatutsOccurences[occurence] : Statut.INCONNU;
+            var previous = EstTraitee[occurence] ? StatutsOccurences[occurence] : Statut.INCONNU;
             StatutsOccurences[occurence] = statut;
+            EstTraitee[occurence] = statut != Statut.INCONNU;
             if (decalageAvant != int.MinValue) {
-                StatutsAppliquer[occurence] = statut != Statut.INCONNU;
                 // Si un offset est spécifié, on l'applique à la position de l'occurence
                 PositionsOccurences[occurence] += decalageAvant;
                 int decalageOccurencesSuivantes = decalageAvant + (decalageApres != int.MinValue ? decalageApres : 0);
@@ -605,30 +639,7 @@ namespace fr.avh.braille.dictionnaire
                         }
                     }
                 }
-            } 
-            //else {
-            //    StatutsAppliquer[occurence] = statut != Statut.INCONNU;
-            //    int change =
-            //        previous == Statut.PROTEGE && statut != Statut.PROTEGE // Suppresion de protection = -1
-            //        ? -1 :
-            //        statut == Statut.PROTEGE && previous != Statut.PROTEGE // Ajout de protection = +1
-            //        ? 1 :
-            //        0; // No change
-            //    if(change != 0) {
-            //        // On applique le changement de position a l'occurence en cours et aux suivantes
-            //        for (int i = occurence; i < PositionsOccurences.Count; i++) {
-            //            // -7, +7 ou 0 s'il y a abreviation, protection ou pas de changement
-            //            PositionsOccurences[i] += (change * PROTECTION_CODE.Length);
-            //        }
-            //        for (int i = 0; i < DebutsBlocsIntegral.Count; i++) {
-            //            if (DebutsBlocsIntegral[i] > PositionsOccurences[occurence]) {
-            //                // Si le debut du bloc est après l'occurence, on décale le bloc
-            //                DebutsBlocsIntegral[i] += (change * PROTECTION_CODE.Length);
-            //                FinsBlocsIntegral[i] += (change * PROTECTION_CODE.Length);
-            //            }
-            //        }
-            //    }
-            //}
+            }
         }
 
         public Tuple<int,int> AjouterBlocIntegral(int debut, int fin = int.MaxValue, bool recalculerOffset = false)
@@ -793,7 +804,7 @@ namespace fr.avh.braille.dictionnaire
             clone.Occurences = new List<string>(Occurences);
             clone.PositionsOccurences = new List<int>(PositionsOccurences);
             clone.StatutsOccurences = new List<Statut>(StatutsOccurences);
-            clone.StatutsAppliquer = new List<bool>(StatutsAppliquer);
+            clone.EstTraitee = new List<bool>(EstTraitee);
             clone.CarteMotOccurences = new Dictionary<string, List<int>>(CarteMotOccurences);
             clone.CarteMotOccurences = new Dictionary<string, List<int>>(CarteMotOccurences);
             clone.ContextesAvantOccurences = new List<string>(ContextesAvantOccurences);
@@ -829,18 +840,42 @@ namespace fr.avh.braille.dictionnaire
                             occurence => PositionsOccurences[occurence] == position
                         ) >= 0
                 )) {
-                    Occurences.Add(mot);
-                    PositionsOccurences.Add(position);
-                    StatutsOccurences.Add(statut);
-                    StatutsAppliquer.Add(statutDejaAppliquer);
-                    ContextesAvantOccurences.Add(contexteAvant);
-                    ContextesApresOccurences.Add(contextApres);
+                
+                        Occurences.Add(mot);
+                        PositionsOccurences.Add(position);
+                        StatutsOccurences.Add(statut);
+                        EstTraitee.Add(statutDejaAppliquer);
+                        ContextesAvantOccurences.Add(contexteAvant);
+                        ContextesApresOccurences.Add(contextApres);
                 }
             }
-
         }
 
-        
+        public void AjouterOccurence(Abreviation.OccurenceATraiter toAdd)
+        {
+            lock (this) {
+                string wordKey = toAdd.Mot.ToLower().Trim();
+                // Si l'occurence n'existe pas déjà dans le dictionnaire
+                if ( !(
+                    CarteMotOccurences.ContainsKey(wordKey)
+                    && CarteMotOccurences[wordKey]
+                        .FindIndex(
+                            occurence => PositionsOccurences[occurence] == toAdd.Index
+                        ) >= 0
+                )) {
+                
+                    Occurences.Add(toAdd.Mot);
+                    PositionsOccurences.Add(toAdd.Index);
+                    StatutsOccurences.Add((toAdd.EstDejaProteger || (toAdd.CommenceUnBlocIntegral && toAdd.TermineUnBlocIntegral)) ? Statut.PROTEGE : Statut.INCONNU);
+                    EstTraitee.Add((toAdd.EstDejaProteger || (toAdd.CommenceUnBlocIntegral && toAdd.TermineUnBlocIntegral)));
+                    ContextesAvantOccurences.Add(toAdd.ContexteAvant);
+                    ContextesApresOccurences.Add(toAdd.ContexteApres);
+                }
+            }
+        }
+
+
+
 
         public void ReorderOccurences()
         {
@@ -857,7 +892,7 @@ namespace fr.avh.braille.dictionnaire
             List<string> newOccurences = new List<string>(Occurences.Count);
             List<int> newPositionsOccurences = new List<int>(PositionsOccurences.Count);
             List<Statut> newStatutsOccurences = new List<Statut>(StatutsOccurences.Count);
-            List<bool> newStatutsAppliquer = new List<bool>(StatutsAppliquer.Count);
+            List<bool> newStatutsAppliquer = new List<bool>(EstTraitee.Count);
             List<string> newContextesAvantOccurences = new List<string>(
                 ContextesAvantOccurences.Count
             );
@@ -882,7 +917,7 @@ namespace fr.avh.braille.dictionnaire
                 newOccurences.Add(Occurences[newIndex]);
                 newPositionsOccurences.Add(PositionsOccurences[newIndex]);
                 newStatutsOccurences.Add(StatutsOccurences[newIndex]);
-                newStatutsAppliquer.Add(StatutsAppliquer[newIndex]);
+                newStatutsAppliquer.Add(EstTraitee[newIndex]);
                 newContextesAvantOccurences.Add(ContextesAvantOccurences[newIndex]);
                 newContextesApresOccurences.Add(ContextesApresOccurences[newIndex]);
             }
@@ -890,7 +925,7 @@ namespace fr.avh.braille.dictionnaire
             Occurences = newOccurences;
             PositionsOccurences = newPositionsOccurences;
             StatutsOccurences = newStatutsOccurences;
-            StatutsAppliquer = newStatutsAppliquer;
+            EstTraitee = newStatutsAppliquer;
             ContextesAvantOccurences = newContextesAvantOccurences;
             ContextesApresOccurences = newContextesApresOccurences;
         }
