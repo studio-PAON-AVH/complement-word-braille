@@ -123,7 +123,7 @@ namespace fr.avh.braille.addin
                     protecteur.MotSelectionne
                 ];
                 for(int i = 0; i < occurenceMot.Count && !hasStatutNonAppliquer; i++) {
-                    if(!protecteur.DonneesTraitement.StatutsAppliquer[occurenceMot[i]]) {
+                    if(!protecteur.DonneesTraitement.EstTraitee[occurenceMot[i]]) {
                         hasStatutNonAppliquer = true;
                     }
                 }

@@ -16,7 +16,7 @@ namespace fr.avh.braille.addin
         public FormulaireOptionsComplement()
         {
             InitializeComponent();
-            ActiverPreProtectionAuto.IsChecked = OptionsComplement.Instance.ActiverPreProtectionAuto;
+            ActiverPreProtectionAuto.IsChecked = OptionsComplement.Instance.ActiverPreProtectionStatistique;
         }
 
         private void FermerFenetre_Click(object sender, RoutedEventArgs e)
@@ -27,13 +27,13 @@ namespace fr.avh.braille.addin
 
         private void ActiverPreProtectionAuto_Checked(object sender, RoutedEventArgs e)
         {
-            OptionsComplement.Instance.ActiverPreProtectionAuto = true;
+            OptionsComplement.Instance.ActiverPreProtectionStatistique = true;
             OptionsComplement.Instance.Sauvegarder();
         }
 
         private void ActiverPreProtectionAuto_Unchecked(object sender, RoutedEventArgs e)
         {
-            OptionsComplement.Instance.ActiverPreProtectionAuto = false;
+            OptionsComplement.Instance.ActiverPreProtectionStatistique = false;
             OptionsComplement.Instance.Sauvegarder();
         }
     }

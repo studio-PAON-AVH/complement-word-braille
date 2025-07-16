@@ -11,6 +11,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.IO;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace fr.avh.braille.addin
 {
@@ -75,13 +76,18 @@ namespace fr.avh.braille.addin
             Globals.ThisAddIn.ErrorCallback(Globals.ThisAddIn.Application.ActiveDocument.FullName, ex);
         }
 
-        private async Task<ProtectionWord> GetProtectionToolAsync()
+        private async Task<ProtectionWord> GetProtectionToolAsync(DictionnaireDeTravail importer = null)
         {
             Dispatcher _d = Dispatcher.CurrentDispatcher;
             if (Globals.ThisAddIn.documentProtection.ContainsKey(Globals.ThisAddIn.Application.ActiveDocument.FullName)) {
-                return Globals.ThisAddIn.documentProtection[Globals.ThisAddIn.Application.ActiveDocument.FullName];
+                var tool = Globals.ThisAddIn.documentProtection[Globals.ThisAddIn.Application.ActiveDocument.FullName];
+                if(importer != null) {
+                    tool.DonneesTraitement.RechargerDecisionDe(importer);
+                    protectionTool.AppliquerDecisions(true);
+                }
+                return tool;
             } else {
-                return await Globals.ThisAddIn.AnalyzeCurrentDocument().ContinueWith(t => { 
+                return await Globals.ThisAddIn.AnalyzeCurrentDocument(importer).ContinueWith(t => { 
                     ProtectionWord protection = t.Result;
                     protection.SelectionChanged += (index) =>
                     {
@@ -202,7 +208,7 @@ namespace fr.avh.braille.addin
                             // resélectionner la premiere occurence du mot
                             protector.SelectionnerOccurenceMot(selection.Text.Trim().ToLower(), selectedIndex >= 0 ? selectedIndex : 0);
                             if (actions == null || !actions.IsLoaded) {
-                                actions = new ProtectionInteractiveParMotsDialog(protectionTool);
+                                actions = new ProtectionInteractiveParMotsDialog(protectionTool, true);
                                 actions.ShowDialog();
                             } else {
                                 actions.Activate();
@@ -267,7 +273,7 @@ namespace fr.avh.braille.addin
                             // resélectionner la premiere occurence du mot
                             protector.SelectionnerOccurenceMot(selection.Text.Trim().ToLower(), selectedIndex >= 0 ? selectedIndex : 0);
                             if (actions == null || !actions.IsLoaded) {
-                                actions = new ProtectionInteractiveParMotsDialog(protectionTool);
+                                actions = new ProtectionInteractiveParMotsDialog(protectionTool, true);
                                 actions.ShowDialog();
                             } else {
                                 actions.Activate();
@@ -299,29 +305,55 @@ namespace fr.avh.braille.addin
         private void ChargerDecisions_Click(object sender, RibbonControlEventArgs e)
         {
             Dispatcher _d = Dispatcher.CurrentDispatcher;
-            _d.Invoke(async () =>
-            {
-                try {
-                    protectionTool = await GetProtectionToolAsync();
-                    protectionTool.ReanalyserDocumentSiModification();
-                    // Rechercher un fichier .bdic ou .json ou .ddic
-                    OpenFileDialog openFileDialog = new OpenFileDialog
-                    {
-                        Filter = "Fichiers de décisions (*.bdic, *.json, *.ddic)|*.bdic;*.json;*.ddic",
-                        DefaultExt = ".json",
-                        Title = "Sélectionner un fichier de décisions"
-                    };
-                    if (openFileDialog.ShowDialog() == DialogResult.OK) {
-                        string filePath = openFileDialog.FileName;
-                        protectionTool.ImporterUnDictionnaire(filePath);
-                        InfoCallback(filePath + " chargé avec succès, vous pouvez commencez le traitement par mots");
-                    }
-                } catch (Exception ex) {
-                    ErrorCallback(ex);
-                    return;
-                }
+            try {
                 
-            });
+                // Rechercher un fichier .bdic ou .json ou .ddic
+                OpenFileDialog openFileDialog = new OpenFileDialog
+                {
+                    Filter = "Fichiers de décisions (*.bdic, *.json, *.ddic)|*.bdic;*.json;*.ddic",
+                    DefaultExt = ".json",
+                    Title = "Sélectionner un fichier de décisions"
+                };
+                if (openFileDialog.ShowDialog() == DialogResult.OK) {
+                    string filePath = openFileDialog.FileName;
+                    _d.Invoke( async () =>
+                    {
+                        try {
+                            InfoCallback(
+                                $"Chargement des décisions du dictionnaire {filePath} ..."
+                            );
+                            var dico = await DictionnaireDeTravail.DepuisFichier(filePath);
+                            InfoCallback(
+                                    $"Dictionnaire chargé"
+                                );
+                            
+                            var protecteur = await GetProtectionToolAsync(dico);
+                            protecteur.ReanalyserDocumentSiModification();
+                            if (protecteur.DonneesTraitement.EstTraitee.All(b => b)) {
+                                System.Windows.MessageBox.Show("Tous les mots identifiés dans le document ont été traité, " +
+                                    "Le passage en revue affichera tous les mots traités et non plus uniquement ceux restant à traités.", "Traitement déjà effectué", MessageBoxButton.OK, MessageBoxImage.Information);
+                            }
+
+                            if (actions == null || !actions.IsLoaded) {
+                                actions = new ProtectionInteractiveParMotsDialog(
+                                    protecteur,
+                                    protecteur.DonneesTraitement.EstTraitee.All(b => b) // peut retraiter si tous est deja traiter
+                                );
+                                actions.ShowDialog();
+                            } else {
+                                actions.Activate();
+                            }
+                        } catch(AggregateException ex) {
+
+                        }
+                    });
+                    //InfoCallback(filePath + " chargé avec succès, vous pouvez commencez le traitement par mots");
+                }
+            }
+            catch (Exception ex) {
+                ErrorCallback(ex);
+                return;
+            }
         }
 
         private void LancerTraitementMots_Click(object sender, RibbonControlEventArgs e)
@@ -334,7 +366,18 @@ namespace fr.avh.braille.addin
                     protectionTool = await GetProtectionToolAsync();
                     //protectionTool.ProtectDocument();
                     protectionTool.ReanalyserDocumentSiModification();
-                    new ProtectionInteractiveParMotsDialog(protectionTool).Show();
+                    if(protectionTool.DonneesTraitement.EstTraitee.All(b => b)) {
+                        System.Windows.MessageBox.Show("Tous les mots identifiés dans le document ont été traité, " +
+                            "Le passage en revue affichera tous les mots traités et non plus uniquement ceux restant à traités.", "Traitement déjà effectué", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    if (actions == null || !actions.IsLoaded) {
+                        actions = new ProtectionInteractiveParMotsDialog(protectionTool,
+                            protectionTool.DonneesTraitement.EstTraitee.All(b => b) // peut retraiter si tous est deja traiter
+                        );
+                        actions.ShowDialog();
+                    } else {
+                        actions.Activate();
+                    }
                     //protectionTool.UnProtectDocument();
                 } catch (AggregateException ex) {
                     ErrorCallback(ex);

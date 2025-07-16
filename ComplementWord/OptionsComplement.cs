@@ -27,7 +27,7 @@ namespace fr.avh.braille.addin
                 XmlNode preprotec = config.GetElementsByTagName("preprotectionauto").Item(0);
                 if (preprotec != null) {
                     try {
-                        ActiverPreProtectionAuto = bool.Parse(preprotec.InnerText);
+                        ActiverPreProtectionStatistique = bool.Parse(preprotec.InnerText);
                     }
                     catch (Exception e) {
                     }
@@ -52,7 +52,7 @@ namespace fr.avh.braille.addin
             config.AppendChild(root);
 
             XmlElement preprotectionauto = config.CreateElement("preprotectionauto");
-            preprotectionauto.InnerText = ActiverPreProtectionAuto.ToString();
+            preprotectionauto.InnerText = ActiverPreProtectionStatistique.ToString();
             root.AppendChild(preprotectionauto);
 
             XmlElement lastUpdateCheck = config.CreateElement("lastupdatecheck");
@@ -67,7 +67,7 @@ namespace fr.avh.braille.addin
         /// <summary>
         /// Option d'activation de la pre protection automatique
         /// </summary>
-        public bool ActiverPreProtectionAuto { get; set; } = false;
+        public bool ActiverPreProtectionStatistique { get; set; } = false;
         public DateTime LastUpdateCheck { get; set; } = DateTime.MinValue;
     }
 

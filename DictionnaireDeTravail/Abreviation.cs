@@ -2626,7 +2626,7 @@ namespace fr.avh.braille.dictionnaire
             public bool EstFrançaisAbregeable { get; set; } = false;
 
             public bool EstAmbigu { get; set; } = false;
-            public OccurenceATraiter(string mot, int index, bool estDejaProteger, bool contientDesChiffres = false, bool estAbregeable = false, bool estFrancais = false, bool estAmbigu = false, bool commenceUnBlocIntegral = false , bool termineUnBlocIntegral = false)
+            public OccurenceATraiter(string mot, int index, bool estDejaProteger = false, bool contientDesChiffres = false, bool estAbregeable = false, bool estFrancais = false, bool estAmbigu = false, bool commenceUnBlocIntegral = false , bool termineUnBlocIntegral = false)
             {
                 Mot = mot;
                 Index = index;
@@ -2652,62 +2652,58 @@ namespace fr.avh.braille.dictionnaire
         /// <param name="info"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public static Dictionary<int,OccurenceATraiter> AnalyserTexteComplet(string texteAAnalyser, Utils.OnInfoCallback info = null)
+        public static List<OccurenceATraiter> AnalyserTexteComplet(string texteAAnalyser)
         {
             try {
-                Dictionary<int, OccurenceATraiter> motsAnalyses = new Dictionary<int, OccurenceATraiter>();
 
                 MatchCollection result = WORDS.Matches(texteAAnalyser);
-                if (result.Count > 0) {
-                    info?.Invoke($"Analyse des mots {result.Count} mots du document", new Tuple<int, int>(0, result.Count));
-                    List<Task<OccurenceATraiter>> tasks = new List<Task<OccurenceATraiter>>();
-                    int i = 1;
-                    foreach (Match item in result) {
-                        info?.Invoke(
-                            "",
-                            new Tuple<int, int>(i++, result.Count)
-                        );
-                        bool isAlreadyProtected = item.Groups[1].Success;
-                        bool commenceUnBlocIntegral = item.Groups[1].Success && item.Groups[1].Value == "[[*g1*]]";
-                        string foundWord = item.Groups[2].Value.Trim();
-                        int pos = item.Groups[2].Index;
-                        bool termineUnBlocIntegral = item.Groups[3].Success && item.Groups[3].Value == "[[*g2*]]";
-                        string wordKey = foundWord.ToLower();
-                        tasks.Add(Task.Run(() => new OccurenceATraiter(foundWord, pos, isAlreadyProtected)
-                        {
-                            ContientDesChiffres = Regex.Match(foundWord, $"[{NUM}]").Success,
-                            ContientDesMajuscules = Regex.Match(foundWord, $"[{MAJ}]").Success,
-                            EstAbregeable = EstAbregeable(wordKey),
-                            EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
-                            EstAmbigu = LexiqueFrance.EstAmbigu(wordKey)
-                        }));
-                    }
+                int count = result.Count;
 
-                    try {
-                        i = 1;
-                        info?.Invoke(
-                            "Compilation des résultat de l'analyse"
-                        );
-                        
-                        OccurenceATraiter[] tests = Task.WhenAll(tasks).Result;
-                        foreach (OccurenceATraiter testMot in tests) {
-                            info?.Invoke(
-                                "",
-                                new Tuple<int, int>(i++, result.Count)
-                            );
-                            motsAnalyses.Add(testMot.Index, testMot);
-                        }
-                    }
-                    catch (Exception e) {
-                        throw new Exception("Erreur lors de l'analyse des mots", e);
-                    }
-                }
-                return motsAnalyses;
+                // Requete parallel pour optimisation
+                var query = result.Cast<Match>().AsParallel().Select(item =>
+                {
+                    bool isAlreadyProtected = item.Groups[1].Success;
+                    bool commenceUnBlocIntegral = item.Groups[1].Success && item.Groups[1].Value == "[[*g1*]]";
+                    string foundWord = item.Groups[2].Value.Trim();
+                    int pos = item.Groups[2].Index;
+                    bool termineUnBlocIntegral = item.Groups[3].Success && item.Groups[3].Value == "[[*g2*]]";
+                    string wordKey = foundWord.ToLower();
+                    // Récupération du contexte autour de l'occurence
+                    int indexBefore = Math.Max(0, pos - 50);
+                    int indexAfter = Math.Min(
+                        texteAAnalyser.Length - 1,
+                        pos + foundWord.Length + 50
+                    );
+                    string contextBefore = texteAAnalyser.Substring(
+                        indexBefore,
+                        pos - indexBefore
+                    );
+                    string contextAfter = "";
+
+                    contextAfter = texteAAnalyser.Substring(
+                        pos + foundWord.Length,
+                        indexAfter - foundWord.Length - pos
+                    );
+                    return new OccurenceATraiter(foundWord, pos)
+                    {
+                        EstDejaProteger = isAlreadyProtected,
+                        ContientDesChiffres = Regex.IsMatch(foundWord, $"[{NUM}]"),
+                        ContientDesMajuscules = Regex.IsMatch(foundWord, $"[{MAJ}]"),
+                        EstAbregeable = EstAbregeable(wordKey),
+                        EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
+                        EstAmbigu = LexiqueFrance.EstAmbigu(wordKey),
+                        CommenceUnBlocIntegral = commenceUnBlocIntegral,
+                        TermineUnBlocIntegral = termineUnBlocIntegral,
+                        ContexteAvant = contextBefore,
+                        ContexteApres = contextAfter
+                    };
+                }).ToList();
+                return query;
             }
             catch (AggregateException e) {
                 throw new Exception("Erreur lors de l'analyse du texte", e);
             }
-            
+
         }
 
         public static Dictionary<int, OccurenceATraiter> RechercheMotsAvecChiffres(string texteAAnalyser, Utils.OnInfoCallback info = null)
@@ -2751,60 +2747,53 @@ namespace fr.avh.braille.dictionnaire
                 throw new Exception("Erreur lors de l'analyse du texte", e);
             }
         }
-        public static List<Task<OccurenceATraiter>> RechercheMotsAvecMaj(string texteAAnalyser, Utils.OnInfoCallback info = null)
+        public static List<OccurenceATraiter> RechercheMotsAvecMaj(string texteAAnalyser)
         {
             try {
-                List<Task<OccurenceATraiter>> motsAnalyses = new List<Task<OccurenceATraiter>>();
-                info?.Invoke($"Recherche des mots contenant des majuscules...", new Tuple<int, int>(0, 0));
-
+                
                 MatchCollection result = WORDSMAJ.Matches(texteAAnalyser);
-                if (result.Count > 0) {
-                    info?.Invoke($"Lancement des taches d'analyse des {result.Count} mots détectés", new Tuple<int, int>(0, result.Count));
-                    int i = 1;
-                    foreach (Match item in result) {
-                        info?.Invoke(
-                            "",
-                            new Tuple<int, int>(i++, result.Count)
-                        );
-                        bool isAlreadyProtected = item.Groups[1].Success;
-                        bool commenceUnBlocIntegral = item.Groups[1].Success && item.Groups[1].Value == "[[*g1*]]";
-                        string foundWord = item.Groups[2].Value.Trim();
-                        int pos = item.Groups[2].Index;
-                        bool termineUnBlocIntegral = item.Groups[3].Success && item.Groups[3].Value == "[[*g2*]]";
-                        string wordKey = foundWord.ToLower();
-                        // Récupération du contexte autour de l'occurence
-                        int indexBefore = Math.Max(0, pos - 50);
-                        int indexAfter = Math.Min(
-                            texteAAnalyser.Length - 1,
-                            pos + foundWord.Length + 50
-                        );
-                        string contextBefore = texteAAnalyser.Substring(
-                            indexBefore,
-                            pos - indexBefore
-                        );
-                        string contextAfter = "";
+                int count = result.Count;
 
-                        contextAfter = texteAAnalyser.Substring(
-                            pos + foundWord.Length,
-                            indexAfter - foundWord.Length - pos
-                        );
+                // Requete parallel pour optimisation
+                var query = result.Cast<Match>().AsParallel().Select(item =>
+                {
+                    bool isAlreadyProtected = item.Groups[1].Success;
+                    bool commenceUnBlocIntegral = item.Groups[1].Success && item.Groups[1].Value == "[[*g1*]]";
+                    string foundWord = item.Groups[2].Value.Trim();
+                    int pos = item.Groups[2].Index;
+                    bool termineUnBlocIntegral = item.Groups[3].Success && item.Groups[3].Value == "[[*g2*]]";
+                    string wordKey = foundWord.ToLower();
+                    // Récupération du contexte autour de l'occurence
+                    int indexBefore = Math.Max(0, pos - 50);
+                    int indexAfter = Math.Min(
+                        texteAAnalyser.Length - 1,
+                        pos + foundWord.Length + 50
+                    );
+                    string contextBefore = texteAAnalyser.Substring(
+                        indexBefore,
+                        pos - indexBefore
+                    );
+                    string contextAfter = "";
 
-                        motsAnalyses.Add(Task.Run(() => new OccurenceATraiter(foundWord, pos, isAlreadyProtected)
-                        {
-                            ContientDesChiffres = false,
-                            ContientDesMajuscules = true,
-                            EstAbregeable = EstAbregeable(wordKey),
-                            //EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
-                            //EstAmbigu = LexiqueFrance.EstAmbigu(wordKey)
-                            CommenceUnBlocIntegral = commenceUnBlocIntegral,
-                            TermineUnBlocIntegral = termineUnBlocIntegral,
-                            ContexteAvant = contextBefore,
-                            ContexteApres = contextAfter
-                        }));
-                    }
-                }
-
-                return motsAnalyses;
+                    contextAfter = texteAAnalyser.Substring(
+                        pos + foundWord.Length,
+                        indexAfter - foundWord.Length - pos
+                    );
+                    return new OccurenceATraiter(foundWord, pos)
+                    {
+                        EstDejaProteger = isAlreadyProtected,
+                        ContientDesChiffres = false,
+                        ContientDesMajuscules = true,
+                        EstAbregeable = EstAbregeable(wordKey),
+                        //EstFrançaisAbregeable = LexiqueFrance.EstFrancaisAbregeable(wordKey),
+                        //EstAmbigu = LexiqueFrance.EstAmbigu(wordKey),
+                        CommenceUnBlocIntegral = commenceUnBlocIntegral,
+                        TermineUnBlocIntegral = termineUnBlocIntegral,
+                        ContexteAvant = contextBefore,
+                        ContexteApres = contextAfter
+                    };
+                }).ToList();
+                return query;
             }
             catch (AggregateException e) {
                 throw new Exception("Erreur lors de l'analyse du texte", e);

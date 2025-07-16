@@ -136,6 +136,33 @@ namespace fr.avh.braille.dictionnaire
             FinsBlocsIntegrals = new SortedSet<int>();
         }
 
+        public static async Task<DictionnaireDeTravail> DepuisFichier(string filePath)
+        {
+            if (!File.Exists(filePath)) {
+                throw new FileNotFoundException(filePath);
+            }
+            DictionnaireDeTravail importer = null;
+            try {
+                switch (Path.GetExtension(filePath).ToLower()) {
+                    case ".json":
+                        importer = await FromDictionnaryFileJSON(filePath);
+                        break;
+                    case ".bdic":
+                        importer = await FromDictionnaryFileBDIC(filePath);
+                        break;
+                    case ".ddic":
+                        importer = await FromDictionnaryFileDDIC(filePath);
+                        break;
+                    default:
+                        throw new NotSupportedException("Format de fichier non supporté : " + Path.GetExtension(filePath));
+                }
+            }
+            catch (Exception ex) {
+                throw new Exception($"Impossible de charger le dictionnaire {filePath}", ex);
+            }
+            return importer;
+        }
+
         #region format DDIC
         /// <summary>
         /// Dictionnaire ne contenant qu'une carte de statut a appliquer
@@ -464,9 +491,9 @@ namespace fr.avh.braille.dictionnaire
                         Statut statut = motEtStatut.Value;
                         CarteMotStatut[mot] = statut;
                         if (CarteMotOccurences.ContainsKey(mot)) {
+                            Statut newStat = CarteMotStatut[mot];
                             // On rappatrie le statut sur toutes les occurences du mot
                             foreach (var occurenceMot in CarteMotOccurences[mot]) {
-                                Statut newStat = CarteMotStatut[mot];
                                 // changement de statut au rechargement : occurence a retraité si elle l'etait deja
                                 if (newStat != StatutsOccurences[occurenceMot]) {
                                     EstTraitee[occurenceMot] = false;
@@ -608,7 +635,7 @@ namespace fr.avh.braille.dictionnaire
         /// <param name="decalageAvant">Decalage a ajouter a l'occurence</param>
         /// <param name="decalageApres">Decalage supplementaire a ajouter aux occurences suivante (decalageFinale = decalageAvant + decalageApres)</param>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
-        public void AppliquerStatut(int occurence, Statut statut, int decalageAvant = int.MinValue, int decalageApres = int.MinValue)
+        public void AppliquerStatut(int occurence, Statut statut, int decalageAvant = 0, int decalageApres = 0)
         {
             if (occurence < 0 || occurence >= StatutsOccurences.Count) {
                 throw new ArgumentOutOfRangeException(nameof(occurence), "L'index d'occurence est hors des limites de la liste.");
@@ -616,26 +643,29 @@ namespace fr.avh.braille.dictionnaire
             var previous = EstTraitee[occurence] ? StatutsOccurences[occurence] : Statut.INCONNU;
             StatutsOccurences[occurence] = statut;
             EstTraitee[occurence] = statut != Statut.INCONNU;
-            if (decalageAvant != int.MinValue) {
+            if (decalageAvant != 0 || decalageApres != 0) {
                 // Si un offset est spécifié, on l'applique à la position de l'occurence
                 PositionsOccurences[occurence] += decalageAvant;
-                int decalageOccurencesSuivantes = decalageAvant + (decalageApres != int.MinValue ? decalageApres : 0);
-                // On décalle les occurences suivantes
-                for (int i = occurence + 1; i < PositionsOccurences.Count; i++) {
-                    PositionsOccurences[i] += decalageOccurencesSuivantes;
-                }
-                // Et les blocs en intéral
-                for (int i = 0; i < DebutsBlocsIntegrals.Count; i++) {
-                    if (DebutsBlocsIntegrals.ElementAt(i) > PositionsOccurences[occurence]) {
-                        // Si le debut du bloc est après l'occurence, on décale le bloc
-                        int oldStart = DebutsBlocsIntegrals.ElementAt(i);
-                        DebutsBlocsIntegrals.Remove(oldStart);
-                        DebutsBlocsIntegrals.Add(oldStart + decalageOccurencesSuivantes);
+                int decalageOccurencesSuivantes = decalageAvant + decalageApres;
+                // Si un offset positif ou negatif (mais pas 0) est spécifié, on décale les occurences suivantes
+                if (decalageOccurencesSuivantes != 0) {
+                    // On décalle les occurences suivantes
+                    for (int i = occurence + 1; i < PositionsOccurences.Count; i++) {
+                        PositionsOccurences[i] += decalageOccurencesSuivantes;
+                    }
+                    // Et les blocs en intéral
+                    for (int i = 0; i < DebutsBlocsIntegrals.Count; i++) {
+                        if (DebutsBlocsIntegrals.ElementAt(i) > PositionsOccurences[occurence]) {
+                            // Si le debut du bloc est après l'occurence, on décale le bloc
+                            int oldStart = DebutsBlocsIntegrals.ElementAt(i);
+                            DebutsBlocsIntegrals.Remove(oldStart);
+                            DebutsBlocsIntegrals.Add(oldStart + decalageOccurencesSuivantes);
 
-                        int oldEnd = FinsBlocsIntegrals.ElementAt(i);
-                        if(oldEnd != int.MaxValue) {
-                            FinsBlocsIntegrals.Remove(oldEnd);
-                            FinsBlocsIntegrals.Add(oldEnd + decalageOccurencesSuivantes);
+                            int oldEnd = FinsBlocsIntegrals.ElementAt(i);
+                            if (oldEnd != int.MaxValue) {
+                                FinsBlocsIntegrals.Remove(oldEnd);
+                                FinsBlocsIntegrals.Add(oldEnd + decalageOccurencesSuivantes);
+                            }
                         }
                     }
                 }

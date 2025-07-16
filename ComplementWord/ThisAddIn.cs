@@ -97,7 +97,7 @@ namespace fr.avh.braille.addin
         }
 
 
-        public Task<ProtectionWord> AnalyzeCurrentDocument()
+        public Task<ProtectionWord> AnalyzeCurrentDocument(DictionnaireDeTravail importer = null)
         {
             return Task.Run(() =>
             {
@@ -111,7 +111,8 @@ namespace fr.avh.braille.addin
                             }, (ex) =>
                             {
                                 this.ErrorCallback(file: Globals.ThisAddIn.Application.ActiveDocument.FullName, ex);
-                            })
+                            },
+                            importer)
                         );
                     }
                     return documentProtection[Globals.ThisAddIn.Application.ActiveDocument.FullName];

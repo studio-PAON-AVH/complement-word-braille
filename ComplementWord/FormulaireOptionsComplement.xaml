@@ -7,7 +7,7 @@
              mc:Ignorable="d"
             Title="Options du complément" Width="301" Height="154">
     <Grid Margin="0,0,0,0">
-        <CheckBox x:Name="ActiverPreProtectionAuto" Content="Activer le pré-marquage automatique" Margin="10,10,10,0" Height="21" VerticalAlignment="Top" Checked="ActiverPreProtectionAuto_Checked"  Unchecked="ActiverPreProtectionAuto_Unchecked"/>
+        <CheckBox x:Name="ActiverPreProtectionAuto" Content="Activer la pré-protection statistique" Margin="10,10,10,0" Height="21" VerticalAlignment="Top" Checked="ActiverPreProtectionAuto_Checked"  Unchecked="ActiverPreProtectionAuto_Unchecked"/>
         <Button x:Name="FermerFenetre" Content="Fermer" Margin="0,0,10,10" HorizontalAlignment="Right" Width="55" Height="21" VerticalAlignment="Bottom" Click="FermerFenetre_Click" />
     </Grid>
 </Window>

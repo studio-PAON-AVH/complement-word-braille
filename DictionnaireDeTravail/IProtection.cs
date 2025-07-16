@@ -15,6 +15,8 @@ namespace fr.avh.braille.dictionnaire
     /// </summary>
     public interface IProtection
     {
+
+
         
         /// <summary>
         /// Applique un statut choisi sur une occurence donnée
@@ -24,15 +26,34 @@ namespace fr.avh.braille.dictionnaire
         void AppliquerStatutSurOccurence(int index, Statut statut);
 
         /// <summary>
-        /// Applique un statut choisi sur une plage du texte
+        /// Selectionne et met en avant une occurence donnée
+        /// </summary>
+        /// <param name="index"></param>
+        void AfficherOccurence(int index);
+
+        //bool EstProtegerMot(int positionMotDansTexte);
+
+        //bool EstProtegerBloc(int start, int end);
+
+        /// <summary>
+        /// Inject des codes de protection avant ou autour d'un emplacement dans le texte
+        /// et renvoi le nombre de caractères ajouter avant et après l'emplacement.
         /// </summary>
         /// <param name="start"></param>
         /// <param name="end"></param>
-        /// <param name="statut"></param>
-        //void AppliquerStatutSurBlock(int start, int end, Statut statut);
+        /// <returns></returns>
+        //Tuple<int, int> ProtegerEmplacementEtRenvoyerDecalages(int start, int end);
 
-        void AfficherOccurence(int index);
+        /// <summary>
+        /// Supprime les codes de protection avant ou autour d'un emplacement dans le texte
+        /// et renvoi le nombre de caractères enlever avant et après l'emplacement.
+        /// </summary>
+        /// <param name="start"></param>
+        /// <param name="end"></param>
+        /// <returns></returns>
+        //Tuple<int, int> AbregerEmplacementEtRenvoyerDecalages(int start, int end);
 
+        
 
         // Pour refactorisation, generalisation du traitement
         // L'idée est que le traitement soit portable a d'autre programme ultérieurement

@@ -95,9 +95,11 @@
             // MotsHorsLexique
             // 
             this.MotsHorsLexique.ControlSize = Microsoft.Office.Core.RibbonControlSize.RibbonControlSizeLarge;
+            this.MotsHorsLexique.Enabled = false;
             this.MotsHorsLexique.Label = "&Mots hors lexique";
             this.MotsHorsLexique.Name = "MotsHorsLexique";
             this.MotsHorsLexique.ShowImage = true;
+            this.MotsHorsLexique.Visible = false;
             this.MotsHorsLexique.Click += new Microsoft.Office.Tools.Ribbon.RibbonControlEventHandler(this.MotsHorsLexique_Click);
             // 
             // ChargerDecisions
